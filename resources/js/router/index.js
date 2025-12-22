@@ -15,6 +15,9 @@ import CardInvoice from '@/pages/Cards/Invoice.vue';
 import Transactions from '@/pages/Transactions/Index.vue';
 import TransactionForm from '@/pages/Transactions/Form.vue';
 import Categories from '@/pages/Categories/Index.vue';
+import Recurrences from '@/pages/Recurrences/Index.vue';
+import Budgets from '@/pages/Budgets/Index.vue';
+import Goals from '@/pages/Goals/Index.vue';
 import Settings from '@/pages/Settings.vue';
 
 const routes = [
@@ -111,6 +114,30 @@ const routes = [
         path: '/categories',
         name: 'categories',
         component: Categories,
+        meta: { auth: true },
+    },
+
+    // Recurrences (Recorrências)
+    {
+        path: '/recurrences',
+        name: 'recurrences',
+        component: Recurrences,
+        meta: { auth: true },
+    },
+
+    // Budgets (Orçamentos)
+    {
+        path: '/budgets',
+        name: 'budgets',
+        component: Budgets,
+        meta: { auth: true },
+    },
+
+    // Goals (Objetivos)
+    {
+        path: '/goals',
+        name: 'goals',
+        component: Goals,
         meta: { auth: true },
     },
 

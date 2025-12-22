@@ -13,6 +13,11 @@
             </RouterLink>
         </div>
 
+        <!-- Dismissable info banner -->
+        <DismissableBanner storage-key="cards-info" color="purple">
+            Visualize seus cartões de crédito e débito. Acompanhe faturas, limites e datas de vencimento em um só lugar.
+        </DismissableBanner>
+
         <!-- Cards grid -->
         <div v-if="cardsStore.loading" class="text-center py-12">
             <svg class="animate-spin h-8 w-8 mx-auto text-primary-600" fill="none" viewBox="0 0 24 24">
@@ -353,6 +358,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
+import DismissableBanner from '@/components/Common/DismissableBanner.vue';
 import { useCardsStore } from '@/stores/cards';
 import axios from 'axios';
 import Timeline from '@/components/Common/Timeline.vue';

@@ -13,6 +13,11 @@
             </RouterLink>
         </div>
 
+        <!-- Dismissable info banner -->
+        <DismissableBanner storage-key="accounts-info" color="blue">
+            Aqui você visualiza e gerencia suas contas bancárias. O saldo de cada conta é atualizado automaticamente conforme seus lançamentos.
+        </DismissableBanner>
+
         <!-- Total balance card -->
         <div class="card mb-6 bg-gradient-to-r from-primary-600 to-primary-700 text-white">
             <div class="flex items-center justify-between">
@@ -300,6 +305,7 @@ import { RouterLink } from 'vue-router';
 import { useAccountsStore } from '@/stores/accounts';
 import axios from 'axios';
 import Timeline from '@/components/Common/Timeline.vue';
+import DismissableBanner from '@/components/Common/DismissableBanner.vue';
 
 const accountsStore = useAccountsStore();
 const showDetailModal = ref(false);

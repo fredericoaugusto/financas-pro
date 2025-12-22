@@ -13,6 +13,11 @@
             </button>
         </div>
 
+        <!-- Dismissable info banner -->
+        <DismissableBanner storage-key="categories-info" color="yellow">
+            Categorias ajudam a organizar seus lançamentos de receitas e despesas. Use-as também para definir orçamentos mensais ou anuais.
+        </DismissableBanner>
+
         <!-- Categories list -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Income categories -->
@@ -160,6 +165,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useCategoriesStore } from '@/stores/categories';
+import DismissableBanner from '@/components/Common/DismissableBanner.vue';
 
 const categoriesStore = useCategoriesStore();
 const showCreateModal = ref(false);

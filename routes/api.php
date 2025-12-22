@@ -5,6 +5,9 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\CardController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\TransactionController;
+use App\Http\Controllers\Api\RecurringTransactionController;
+use App\Http\Controllers\Api\BudgetController;
+use App\Http\Controllers\Api\GoalController;
 use App\Http\Controllers\Api\ReportController;
 use Illuminate\Support\Facades\Route;
 
@@ -51,8 +54,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('transactions/{transaction}/refund-by-value', [TransactionController::class, 'refundByValue']);
     Route::patch('transactions/{transaction}/notes', [TransactionController::class, 'updateNotes']);
 
+    // Recurring Transactions (Recorrências)
+    Route::apiResource('recurring-transactions', RecurringTransactionController::class);
+    Route::post('recurring-transactions/{recurring_transaction}/pause', [RecurringTransactionController::class, 'pause']);
+    Route::post('recurring-transactions/{recurring_transaction}/resume', [RecurringTransactionController::class, 'resume']);
+    Route::post('recurring-transactions/{recurring_transaction}/end', [RecurringTransactionController::class, 'end']);
+    Route::post('recurring-transactions/{recurring_transaction}/generate', [RecurringTransactionController::class, 'generate']);
+    Route::get('recurring-transactions-projection', [RecurringTransactionController::class, 'projection']);
+
     // Categories
     Route::apiResource('categories', CategoryController::class)->except(['show']);
+
+    // Budgets (Orçamentos)
+    Route::apiResource('budgets', BudgetController::class)->except(['show']);
+    Route::get('budgets/summary', [BudgetController::class, 'summary']);
+
+    // Goals (Objetivos)
+    Route::apiResource('goals', GoalController::class);
+    Route::post('goals/{goal}/deposit', [GoalController::class, 'deposit']);
+    Route::post('goals/{goal}/withdraw', [GoalController::class, 'withdraw']);
+    Route::post('goals/{goal}/cancel', [GoalController::class, 'cancel']);
+    Route::post('goals/{goal}/reactivate', [GoalController::class, 'reactivate']);
 
     // Reports / Dashboard
     Route::get('reports/dashboard', [ReportController::class, 'dashboard']);

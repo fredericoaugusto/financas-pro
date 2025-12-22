@@ -20,6 +20,7 @@ class Transaction extends Model
         'card_id',
         'category_id',
         'card_invoice_id',
+        'recurring_transaction_id',
         'type',
         'value', // Valor TOTAL da compra
         'description',
@@ -83,6 +84,14 @@ class Transaction extends Model
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'transaction_tags');
+    }
+
+    /**
+     * Recorrência que gerou esta transação (opcional)
+     */
+    public function recurringTransaction(): BelongsTo
+    {
+        return $this->belongsTo(RecurringTransaction::class);
     }
 
     /**

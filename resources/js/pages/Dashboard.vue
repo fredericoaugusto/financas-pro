@@ -383,14 +383,31 @@ async function loadDashboardData() {
         upcomingInvoices.value = allInvoices.slice(0, 5); // Limit for UI
         stats.value.openInvoices = allInvoices.reduce((sum, i) => sum + (parseFloat(i.total_value || 0) - parseFloat(i.paid_value || 0)), 0);
 
-        // Calculate predicted balance (current balance - future expenses - open invoices)
+        // Calculate predicted balance (current balance + projected recurrences - open invoices)
         const currentDate = new Date();
         const isCurrentMonth = selectedMonth.value === (currentDate.getMonth() + 1) && selectedYear.value === currentDate.getFullYear();
         const isFutureMonth = new Date(selectedYear.value, selectedMonth.value - 1, 1) > currentDate;
         
         if (isCurrentMonth || isFutureMonth) {
-            // For current/future months, predicted = balance - pending expenses - open invoices
-            stats.value.predictedBalance = stats.value.totalBalance - stats.value.openInvoices;
+            // Fetch recurrence projections for the period
+            try {
+                const projectionResponse = await axios.get('/api/recurring-transactions-projection', {
+                    params: {
+                        start_date: periodStart,
+                        end_date: periodEnd,
+                    },
+                });
+                
+                const projection = projectionResponse.data.data;
+                // Predicted = balance + projected income - projected expenses - open invoices
+                stats.value.predictedBalance = stats.value.totalBalance 
+                    + projection.receitas 
+                    - projection.despesas 
+                    - stats.value.openInvoices;
+            } catch (e) {
+                // Fallback to simple calculation without recurrences
+                stats.value.predictedBalance = stats.value.totalBalance - stats.value.openInvoices;
+            }
         } else {
             // For past months, just show the current balance
             stats.value.predictedBalance = stats.value.totalBalance;
