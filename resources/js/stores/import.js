@@ -8,7 +8,13 @@ export const useImportStore = defineStore('import', {
         accountInfo: null,
         transactions: [],
         stats: null,
+
+        // Options for dropdowns
         categories: [],
+        paymentMethods: {},
+        accounts: [],
+        cards: [],
+
         selectedIds: new Set(),
     }),
 
@@ -23,10 +29,6 @@ export const useImportStore = defineStore('import', {
 
         newTransactions: (state) => {
             return state.transactions.filter(t => t.technical_status === 'new');
-        },
-
-        duplicateTransactions: (state) => {
-            return state.transactions.filter(t => t.technical_status === 'duplicate');
         },
 
         totalSelectedIncome: (state) => {
@@ -60,15 +62,16 @@ export const useImportStore = defineStore('import', {
 
             try {
                 const response = await axios.post('/api/import/parse', formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
+                    headers: { 'Content-Type': 'multipart/form-data' },
                 });
 
                 this.accountInfo = response.data.account_info;
                 this.transactions = response.data.transactions;
                 this.stats = response.data.stats;
-                this.categories = response.data.categories;
+                this.categories = response.data.categories || [];
+                this.paymentMethods = response.data.payment_methods || {};
+                this.accounts = response.data.accounts || [];
+                this.cards = response.data.cards || [];
 
                 // Pre-select new transactions
                 this.selectedIds = new Set();
@@ -87,9 +90,15 @@ export const useImportStore = defineStore('import', {
             }
         },
 
-        async confirmImport(status = 'confirmada') {
+        async confirmImport(status = 'confirmada', defaultAccountId = null) {
             if (this.selectedIds.size === 0) {
                 throw new Error('Nenhuma transação selecionada');
+            }
+
+            // Validate that we have an account
+            if (!defaultAccountId) {
+                this.error = 'Selecione uma conta de destino antes de importar';
+                throw new Error('Selecione uma conta de destino antes de importar');
             }
 
             this.loading = true;
@@ -99,9 +108,11 @@ export const useImportStore = defineStore('import', {
                 date: t.original.date,
                 description: t.original.description,
                 amount: t.original.amount,
-                type: t.original.type,
-                category: t.suggested_category,
-                account_id: t.account_id || null,
+                type: t.suggested_type || t.original.type,
+                category_id: t.suggested_category_id || null,
+                account_id: t.suggested_account_id || null, // Can be null, backend will use default
+                card_id: t.suggested_card_id || null,
+                payment_method: t.suggested_payment_method || null,
                 hash: t.original.hash,
                 hash_version: t.original.hash_version,
                 status: status,
@@ -109,12 +120,11 @@ export const useImportStore = defineStore('import', {
 
             try {
                 const response = await axios.post('/api/import/confirm', {
+                    default_account_id: parseInt(defaultAccountId),
                     transactions: transactionsToImport,
                 });
 
-                // Clear state after successful import
                 this.reset();
-
                 return response.data;
             } catch (err) {
                 this.error = err.response?.data?.message || 'Erro ao importar transações';
@@ -130,7 +140,6 @@ export const useImportStore = defineStore('import', {
             } else {
                 this.selectedIds.add(index);
             }
-            // Trigger reactivity
             this.selectedIds = new Set(this.selectedIds);
         },
 
@@ -151,16 +160,50 @@ export const useImportStore = defineStore('import', {
             });
         },
 
-        updateCategory(index, category) {
+        updateCategoryId(index, categoryId) {
             if (this.transactions[index]) {
-                this.transactions[index].suggested_category = category;
+                this.transactions[index].suggested_category_id = categoryId ? parseInt(categoryId) : null;
             }
         },
 
-        updateAccountId(index, accountId) {
+        updateAccount(index, accountId) {
             if (this.transactions[index]) {
-                this.transactions[index].account_id = accountId;
+                this.transactions[index].suggested_account_id = accountId ? parseInt(accountId) : null;
             }
+        },
+
+        updateCard(index, cardId) {
+            if (this.transactions[index]) {
+                this.transactions[index].suggested_card_id = cardId ? parseInt(cardId) : null;
+            }
+        },
+
+        updatePaymentMethod(index, method) {
+            if (this.transactions[index]) {
+                this.transactions[index].suggested_payment_method = method || null;
+            }
+        },
+
+        updateType(index, type) {
+            if (this.transactions[index]) {
+                this.transactions[index].suggested_type = type;
+            }
+        },
+
+        bulkUpdateAccount(accountId) {
+            this.selectedIds.forEach(index => {
+                if (this.transactions[index]) {
+                    this.transactions[index].suggested_account_id = accountId ? parseInt(accountId) : null;
+                }
+            });
+        },
+
+        bulkUpdateCategoryId(categoryId) {
+            this.selectedIds.forEach(index => {
+                if (this.transactions[index]) {
+                    this.transactions[index].suggested_category_id = categoryId ? parseInt(categoryId) : null;
+                }
+            });
         },
 
         reset() {
@@ -168,6 +211,9 @@ export const useImportStore = defineStore('import', {
             this.transactions = [];
             this.stats = null;
             this.categories = [];
+            this.paymentMethods = {};
+            this.accounts = [];
+            this.cards = [];
             this.selectedIds = new Set();
             this.error = null;
         },

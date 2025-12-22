@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\AuditLog;
+use App\Models\Card;
+use App\Models\Category;
 use App\Models\Transaction;
 use App\Services\ImportDetectionService;
 use App\Services\OfxParserService;
@@ -19,19 +22,15 @@ class ImportController extends Controller
     ) {
     }
 
-    /**
-     * Parse an uploaded OFX file and return analyzed transactions.
-     */
     public function parse(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|max:10240', // Max 10MB
+            'file' => 'required|file|max:10240',
         ]);
 
         $file = $request->file('file');
-
-        // Validate file extension
         $extension = strtolower($file->getClientOriginalExtension());
+
         if (!in_array($extension, ['ofx', 'qfx'])) {
             return response()->json([
                 'message' => 'Formato inválido. Apenas arquivos OFX e QFX são suportados.',
@@ -39,7 +38,6 @@ class ImportController extends Controller
         }
 
         try {
-            // Parse the OFX file
             $parsed = $this->ofxParser->parse($file);
 
             if (empty($parsed['transactions'])) {
@@ -50,21 +48,32 @@ class ImportController extends Controller
                 ], 200);
             }
 
-            // Analyze for duplicates, categories, etc.
+            $userId = auth()->id();
+
             $analyzed = $this->detectionService->analyze(
                 $parsed['transactions'],
-                auth()->id()
+                $userId,
+                $parsed['account_info']
             );
 
-            // Get statistics
             $stats = $this->getStats($analyzed);
+
+            // Get user's categories
+            $categories = Category::where('user_id', $userId)
+                ->orWhereNull('user_id')
+                ->select('id', 'name', 'icon', 'color', 'type')
+                ->orderBy('name')
+                ->get();
 
             return response()->json([
                 'message' => 'Arquivo processado com sucesso.',
                 'account_info' => $parsed['account_info'],
                 'transactions' => $analyzed,
                 'stats' => $stats,
-                'categories' => $this->detectionService->getKnownCategories(),
+                'categories' => $categories,
+                'payment_methods' => $this->detectionService->getAvailablePaymentMethods(),
+                'accounts' => Account::where('user_id', $userId)->select('id', 'name', 'bank')->get(),
+                'cards' => Card::where('user_id', $userId)->select('id', 'name', 'brand', 'last_four')->get(),
             ]);
 
         } catch (\Exception $e) {
@@ -74,25 +83,26 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Confirm and import selected transactions.
-     */
     public function confirm(Request $request): JsonResponse
     {
         $request->validate([
+            'default_account_id' => 'required|exists:accounts,id',
             'transactions' => 'required|array|min:1',
             'transactions.*.date' => 'required|date',
             'transactions.*.description' => 'required|string|max:255',
             'transactions.*.amount' => 'required|numeric',
-            'transactions.*.type' => 'required|in:receita,despesa',
-            'transactions.*.category' => 'nullable|string|max:50',
+            'transactions.*.type' => 'required|in:receita,despesa,transferencia',
+            'transactions.*.category_id' => 'nullable|exists:categories,id',
             'transactions.*.account_id' => 'nullable|exists:accounts,id',
+            'transactions.*.card_id' => 'nullable|exists:cards,id',
+            'transactions.*.payment_method' => 'nullable|string|max:50',
             'transactions.*.hash' => 'required|string|size:32',
             'transactions.*.hash_version' => 'required|integer',
             'transactions.*.status' => 'nullable|in:confirmada,pendente',
         ]);
 
         $userId = auth()->id();
+        $defaultAccountId = $request->default_account_id;
         $created = [];
         $skipped = [];
 
@@ -100,7 +110,6 @@ class ImportController extends Controller
 
         try {
             foreach ($request->transactions as $txData) {
-                // Double-check for duplicates before inserting
                 $existingHash = Transaction::where('user_id', $userId)
                     ->where('import_hash', $txData['hash'])
                     ->exists();
@@ -110,16 +119,25 @@ class ImportController extends Controller
                     continue;
                 }
 
+                $type = $txData['type'];
+                if ($type === 'transferencia') {
+                    $type = $txData['amount'] >= 0 ? 'receita' : 'despesa';
+                }
+
+                // Use item's account_id if set, otherwise use default
+                $accountId = $txData['account_id'] ?? $defaultAccountId;
+
                 $transaction = Transaction::create([
                     'user_id' => $userId,
-                    'account_id' => $txData['account_id'] ?? null,
+                    'account_id' => $accountId,
+                    'card_id' => $txData['card_id'] ?? null,
+                    'category_id' => $txData['category_id'] ?? null,
                     'description' => $txData['description'],
                     'value' => abs($txData['amount']),
-                    'type' => $txData['type'],
+                    'type' => $type,
                     'date' => $txData['date'],
-                    'category' => $txData['category'] ?? null,
                     'status' => $txData['status'] ?? 'confirmada',
-                    'payment_method' => 'importado',
+                    'payment_method' => $txData['payment_method'] ?? null,
                     'notes' => 'Importado via OFX',
                     'import_hash' => $txData['hash'],
                     'import_hash_version' => $txData['hash_version'],
@@ -128,7 +146,6 @@ class ImportController extends Controller
                 $created[] = $transaction->id;
             }
 
-            // Log the import action
             AuditLog::log(
                 'import_transactions',
                 'Transaction',
@@ -152,16 +169,12 @@ class ImportController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-
             return response()->json([
                 'message' => 'Erro ao importar transações: ' . $e->getMessage(),
             ], 500);
         }
     }
 
-    /**
-     * Get statistics from analyzed transactions.
-     */
     private function getStats(array $analyzed): array
     {
         $stats = [
@@ -176,7 +189,6 @@ class ImportController extends Controller
 
         foreach ($analyzed as $item) {
             $stats[$item['technical_status']]++;
-
             $amount = $item['original']['amount'] ?? 0;
             if ($amount > 0) {
                 $stats['total_income'] += $amount;
