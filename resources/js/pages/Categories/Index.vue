@@ -30,7 +30,8 @@
                     <div
                         v-for="category in incomeCategories"
                         :key="category.id"
-                        class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                        @click="navigateToTransactions(category)"
+                        class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
                     >
                         <div class="flex items-center gap-3">
                             <div
@@ -42,7 +43,7 @@
                             <span class="font-medium text-gray-900 dark:text-white">{{ category.name }}</span>
                         </div>
                         <button
-                            @click="handleDelete(category)"
+                            @click.stop="handleDelete(category)"
                             class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                         >
                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,7 +64,8 @@
                     <div
                         v-for="category in expenseCategories"
                         :key="category.id"
-                        class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                        @click="navigateToTransactions(category)"
+                        class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
                     >
                         <div class="flex items-center gap-3">
                             <div
@@ -75,7 +77,7 @@
                             <span class="font-medium text-gray-900 dark:text-white">{{ category.name }}</span>
                         </div>
                         <button
-                            @click="handleDelete(category)"
+                            @click.stop="handleDelete(category)"
                             class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                         >
                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,6 +166,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useCategoriesStore } from '@/stores/categories';
 import DismissableBanner from '@/components/Common/DismissableBanner.vue';
 
@@ -218,4 +221,28 @@ async function confirmDelete() {
 onMounted(() => {
     categoriesStore.fetchCategories();
 });
+
+const router = useRouter();
+
+function navigateToTransactions(category) {
+    // Navigate to transactions filtered by this category
+    // Default to current month for better UX
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    // Use sv-SE for YYYY-MM-DD format respecting local time
+    const formatDate = (date) => date.toLocaleDateString('sv-SE');
+
+    router.push({
+        path: '/transactions',
+        query: {
+            category_id: category.id,
+            date_from: formatDate(start),
+            date_to: formatDate(end),
+            type: category.type
+        }
+    });
+}
+
 </script>

@@ -18,6 +18,7 @@ import Categories from '@/pages/Categories/Index.vue';
 import Recurrences from '@/pages/Recurrences/Index.vue';
 import Budgets from '@/pages/Budgets/Index.vue';
 import Goals from '@/pages/Goals/Index.vue';
+import Charts from '@/pages/Charts/Index.vue';
 import Settings from '@/pages/Settings.vue';
 
 const routes = [
@@ -138,6 +139,14 @@ const routes = [
         path: '/goals',
         name: 'goals',
         component: Goals,
+        meta: { auth: true },
+    },
+
+    // Charts
+    {
+        path: '/charts',
+        name: 'charts',
+        component: Charts,
         meta: { auth: true },
     },
 

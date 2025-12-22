@@ -7,21 +7,36 @@ use App\Models\Card;
 use App\Models\Transaction;
 use App\Models\AuditLog;
 use App\Services\TransactionService;
+use App\Services\TransactionFilterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class TransactionController extends Controller
 {
     protected TransactionService $transactionService;
+    protected TransactionFilterService $filterService;
 
-    public function __construct(TransactionService $transactionService)
-    {
+    public function __construct(
+        TransactionService $transactionService,
+        TransactionFilterService $filterService
+    ) {
         $this->transactionService = $transactionService;
+        $this->filterService = $filterService;
     }
 
     /**
      * Lista transações com filtros e paginação
      * REGRA: Mostra apenas transações (compras), não parcelas individuais
+     * 
+     * Filtros padronizados (via TransactionFilterService):
+     * - type: receita, despesa, transferencia
+     * - category_id: ID da categoria
+     * - account_id: ID da conta
+     * - card_id: ID do cartão
+     * - date_from: Data inicial (YYYY-MM-DD)
+     * - date_to: Data final (YYYY-MM-DD)
+     * - status: pendente, paga, agendada
+     * - search: Busca por descrição
      */
     public function index(Request $request): JsonResponse
     {
@@ -31,37 +46,9 @@ class TransactionController extends Controller
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc');
 
-        // Filtros
-        if ($request->type) {
-            $query->where('type', $request->type);
-        }
-
-        if ($request->category_id) {
-            $query->where('category_id', $request->category_id);
-        }
-
-        if ($request->account_id) {
-            $query->where(function ($q) use ($request) {
-                $q->where('account_id', $request->account_id)
-                    ->orWhere('from_account_id', $request->account_id);
-            });
-        }
-
-        if ($request->card_id) {
-            $query->where('card_id', $request->card_id);
-        }
-
-        if ($request->date_from) {
-            $query->whereDate('date', '>=', $request->date_from);
-        }
-
-        if ($request->date_to) {
-            $query->whereDate('date', '<=', $request->date_to);
-        }
-
-        if ($request->search) {
-            $query->where('description', 'like', "%{$request->search}%");
-        }
+        // Aplicar filtros via service
+        $filters = $this->filterService->extractFilters($request->all());
+        $query = $this->filterService->apply($query, $filters);
 
         $perPage = $request->per_page ?? 50;
         $transactions = $query->paginate($perPage);
@@ -74,6 +61,7 @@ class TransactionController extends Controller
                 'per_page' => $transactions->perPage(),
                 'total' => $transactions->total(),
             ],
+            'filters' => $filters, // Retorna filtros aplicados para sync de URL
         ]);
     }
 

@@ -13,12 +13,14 @@
             </RouterLink>
         </div>
 
+
+        <!-- Filters -->
         <!-- Filters -->
         <div class="card mb-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                 <div>
                     <label class="label">Tipo</label>
-                    <select v-model="transactionsStore.filters.type" @change="handleFilter" class="input">
+                    <select v-model="transactionsStore.filters.type" class="input">
                         <option value="">Todos</option>
                         <option value="receita">Receitas</option>
                         <option value="despesa">Despesas</option>
@@ -26,8 +28,17 @@
                     </select>
                 </div>
                 <div>
+                    <label class="label">Categoria</label>
+                    <select v-model="transactionsStore.filters.category_id" class="input">
+                        <option value="">Todas as categorias</option>
+                        <option v-for="category in categories" :key="category.id" :value="category.id">
+                            {{ category.icon }} {{ category.name }}
+                        </option>
+                    </select>
+                </div>
+                <div>
                     <label class="label">Conta</label>
-                    <select v-model="transactionsStore.filters.account_id" @change="handleFilter" class="input">
+                    <select v-model="transactionsStore.filters.account_id" class="input">
                         <option value="">Todas as contas</option>
                         <option v-for="account in accounts" :key="account.id" :value="account.id">
                             {{ account.name }}{{ account.status === 'archived' ? ' (arquivada)' : '' }}
@@ -36,7 +47,7 @@
                 </div>
                 <div>
                     <label class="label">Cartão</label>
-                    <select v-model="transactionsStore.filters.card_id" @change="handleFilter" class="input">
+                    <select v-model="transactionsStore.filters.card_id" class="input">
                         <option value="">Todos os cartões</option>
                         <option v-for="card in cards" :key="card.id" :value="card.id">
                             {{ card.name }}
@@ -45,28 +56,36 @@
                 </div>
                 <div>
                     <label class="label">Data inicial</label>
-                    <input type="date" v-model="transactionsStore.filters.date_from" @change="handleFilter" class="input" />
+                    <input type="date" v-model="transactionsStore.filters.date_from" class="input" />
                 </div>
                 <div>
                     <label class="label">Data final</label>
-                    <input type="date" v-model="transactionsStore.filters.date_to" @change="handleFilter" class="input" />
+                    <input type="date" v-model="transactionsStore.filters.date_to" class="input" />
                 </div>
                 <div>
                     <label class="label">Buscar</label>
                     <input
                         type="text"
                         v-model="transactionsStore.filters.search"
-                        @input="debouncedSearch"
                         class="input"
                         placeholder="Descrição..."
                     />
                 </div>
             </div>
-            <div v-if="hasActiveFilters" class="mt-4 flex items-center gap-2">
-                <span class="text-sm text-gray-500">Filtros ativos</span>
-                <button @click="clearFilters" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                    Limpar filtros
-                </button>
+            <div v-if="hasActiveFilters" class="mt-4 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500">Filtros ativos</span>
+                    <button @click="clearFilters" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                        Limpar filtros
+                    </button>
+                </div>
+                
+                <!-- Period presets -->
+                <div class="flex gap-2 text-sm">
+                    <button @click="setPeriod('this_month')" class="text-gray-500 hover:text-primary-600">Este Mês</button>
+                    <button @click="setPeriod('last_30')" class="text-gray-500 hover:text-primary-600">Últimos 30 dias</button>
+                    <button @click="setPeriod('this_year')" class="text-gray-500 hover:text-primary-600">Este Ano</button>
+                </div>
             </div>
         </div>
 
@@ -550,29 +569,20 @@ const refundValue = ref(0);
 const showAnticipateModal = ref(false);
 const transactionToAnticipate = ref(null);
 
+import { useCategoriesStore } from '@/stores/categories';
+import { useFilters } from '@/composables/useFilters';
+
 const accounts = computed(() => accountsStore.accounts);
 const cards = computed(() => cardsStore.cards);
+const categories = computed(() => categoriesStore.categories);
 
 const hasActiveFilters = computed(() => {
     const f = transactionsStore.filters;
-    return f.type || f.account_id || f.card_id || f.date_from || f.date_to || f.search;
+    return f.type || f.category_id || f.account_id || f.card_id || f.date_from || f.date_to || f.search;
 });
-
-let searchTimeout;
-function debouncedSearch() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        transactionsStore.fetchTransactions();
-    }, 300);
-}
-
-function handleFilter() {
-    transactionsStore.fetchTransactions();
-}
 
 function clearFilters() {
     transactionsStore.clearFilters();
-    transactionsStore.fetchTransactions();
 }
 
 function formatCurrency(value) {
@@ -728,35 +738,56 @@ async function handleDelete() {
     }
 }
 
+const categoriesStore = useCategoriesStore();
+const { isInitialized } = useFilters(
+    transactionsStore.filters,
+    () => transactionsStore.fetchTransactions(1),
+    {
+        type: '',
+        category_id: '',
+        account_id: '',
+        card_id: '',
+        date_from: '',
+        date_to: '',
+        search: '',
+    }
+);
+
 onMounted(async () => {
     await Promise.all([
         accountsStore.fetchAccounts(),
         cardsStore.fetchCards(),
+        categoriesStore.fetchCategories(),
     ]);
     
-    if (route.query.account_id) {
-        transactionsStore.filters.account_id = route.query.account_id;
-    }
-    if (route.query.card_id) {
-        transactionsStore.filters.card_id = route.query.card_id;
-    }
-    if (route.query.type) {
-        transactionsStore.filters.type = route.query.type;
-    }
-    
-    await transactionsStore.fetchTransactions();
+    // Initial fetch is handled by useFilters onMounted
 });
 
-watch(() => route.query, (newQuery) => {
-    if (newQuery.account_id) {
-        transactionsStore.filters.account_id = newQuery.account_id;
+// Helper for filtering by period
+function setPeriod(period) {
+    const today = new Date();
+    let start, end;
+
+    if (period === 'this_month') {
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } else if (period === 'last_30') {
+        end = today;
+        start = new Date();
+        start.setDate(today.getDate() - 30);
+    } else if (period === 'this_year') {
+        start = new Date(today.getFullYear(), 0, 1);
+        end = new Date(today.getFullYear(), 11, 31);
     }
-    if (newQuery.card_id) {
-        transactionsStore.filters.card_id = newQuery.card_id;
-    }
-    if (newQuery.type) {
-        transactionsStore.filters.type = newQuery.type;
-    }
-    transactionsStore.fetchTransactions();
-}, { deep: true });
+
+    const formatDate = (date) => date.toLocaleDateString('sv-SE');
+
+    transactionsStore.setFilters({
+        date_from: formatDate(start),
+        date_to: formatDate(end),
+    });
+}
+
+
+
 </script>

@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\Card;
 use App\Models\Transaction;
 use App\Models\CardInvoice;
+use App\Services\TransactionFilterService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,12 @@ use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
+    protected TransactionFilterService $filterService;
+
+    public function __construct(TransactionFilterService $filterService)
+    {
+        $this->filterService = $filterService;
+    }
     /**
      * Dados do dashboard principal
      */
@@ -169,5 +176,166 @@ class ReportController extends Controller
                 'transaction_count' => $transactions->count(),
             ],
         ]);
+    }
+    public function summary(Request $request): JsonResponse
+    {
+        $filters = $this->filterService->extractFilters($request->all());
+        $data = $this->filterService->getAggregations($request->user()->id, $filters);
+        return response()->json(['data' => $data]);
+    }
+
+    public function byCategory(Request $request): JsonResponse
+    {
+        $filters = $this->filterService->extractFilters($request->all());
+        $data = $this->filterService->getByCategory($request->user()->id, $filters);
+        return response()->json(['data' => $data]);
+    }
+
+    public function byAccount(Request $request): JsonResponse
+    {
+        $filters = $this->filterService->extractFilters($request->all());
+        $data = $this->filterService->getByAccount($request->user()->id, $filters);
+        return response()->json(['data' => $data]);
+    }
+
+    public function monthlyEvolution(Request $request): JsonResponse
+    {
+        $filters = $this->filterService->extractFilters($request->all());
+        $data = $this->filterService->getMonthlyEvolution($request->user()->id, $filters);
+        return response()->json(['data' => $data]);
+    }
+
+    public function savingsRate(Request $request): JsonResponse
+    {
+        $filters = $this->filterService->extractFilters($request->all());
+        $totals = $this->filterService->getAggregations($request->user()->id, $filters);
+
+        $receita = $totals['receita'];
+        $despesa = $totals['despesa'];
+        $savings = $receita - $despesa;
+
+        // Evitar divisão por zero
+        $rate = $receita > 0 ? ($savings / $receita) * 100 : 0;
+
+        return response()->json([
+            'data' => [
+                'rate' => round($rate, 2),
+                'savings' => round($savings, 2),
+                'income' => $receita,
+                'expenses' => $despesa
+            ]
+        ]);
+    }
+
+    public function fixedVsVariable(Request $request): JsonResponse
+    {
+        $filters = $this->filterService->extractFilters($request->all());
+        $userId = $request->user()->id;
+
+        // Base query with filters
+        $query = Transaction::where('user_id', $userId)
+            ->where('type', 'despesa') // Analisar apenas despesas
+            ->whereNotIn('status', ['estornada', 'cancelada']);
+
+        $query = $this->filterService->apply($query, $filters);
+
+        $data = $query->selectRaw("
+                CASE 
+                    WHEN recurring_transaction_id IS NOT NULL THEN 'Fixo' 
+                    ELSE 'Variável' 
+                END as type, 
+                SUM(value) as total
+            ")
+            ->groupBy('type')
+            ->get();
+
+        $formatted = $data->map(function ($item) {
+            return [
+                'name' => $item->type,
+                'total' => (float) $item->total,
+                'color' => $item->type === 'Fixo' ? '#3B82F6' : '#F59E0B', // Azul (Fixo), Laranja (Variável)
+            ];
+        });
+
+        return response()->json(['data' => $formatted]);
+    }
+
+    /**
+     * Evolução do Uso de Crédito (Total Faturas vs Limite)
+     */
+    public function creditLimitEvolution(Request $request): JsonResponse
+    {
+        $userId = $request->user()->id;
+        // Obter limite total atual de cartões ativos
+        $totalLimit = Card::where('user_id', $userId)
+            ->where('status', 'ativo')
+            ->sum('credit_limit');
+
+        // Histórico de Faturas Agrupado por Mês
+        $invoices = CardInvoice::whereHas('card', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        })
+            ->selectRaw("reference_month, SUM(total_value) as total_used")
+            ->groupBy('reference_month')
+            ->orderBy('reference_month')
+            ->get()
+            ->map(function ($inv) use ($totalLimit) {
+                return [
+                    'month' => $inv->reference_month, // YYYY-MM
+                    'used' => (float) $inv->total_used,
+                    'limit' => (float) $totalLimit // Linha de referência
+                ];
+            });
+
+        return response()->json(['data' => $invoices]);
+    }
+
+    /**
+     * Comprometimento Futuro (Parcelas a vencer)
+     */
+    public function futureCommitment(Request $request): JsonResponse
+    {
+        $userId = $request->user()->id;
+        $now = Carbon::now();
+
+        $commitments = \App\Models\CardInstallment::whereHas('transaction', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        })
+            ->whereDate('due_date', '>', $now)
+            ->whereNotIn('status', ['estornada', 'paga'])
+            ->selectRaw("strftime('%Y-%m', due_date) as month, SUM(value) as total")
+            ->groupBy('month')
+            ->orderBy('month')
+            ->limit(12) // Próximos 12 meses
+            ->get();
+
+        return response()->json(['data' => $commitments]);
+    }
+
+    /**
+     * Top Cartões por Uso (Soma das Faturas)
+     */
+    public function topCards(Request $request): JsonResponse
+    {
+        $userId = $request->user()->id;
+
+        $topCards = CardInvoice::whereHas('card', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        })
+            ->join('cards', 'card_invoices.card_id', '=', 'cards.id')
+            ->selectRaw("cards.id, cards.name, cards.color, SUM(card_invoices.total_value) as total")
+            ->groupBy('cards.id', 'cards.name', 'cards.color')
+            ->orderByDesc('total')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'name' => $item->name,
+                    'total' => (float) $item->total,
+                    'color' => $item->color ?? '#6B7280'
+                ];
+            });
+
+        return response()->json(['data' => $topCards]);
     }
 }

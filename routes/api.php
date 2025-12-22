@@ -79,6 +79,21 @@ Route::middleware('auth:sanctum')->group(function () {
     // Reports / Dashboard
     Route::get('reports/dashboard', [ReportController::class, 'dashboard']);
     Route::get('reports/period', [ReportController::class, 'period']);
+    Route::get('reports/summary', [ReportController::class, 'summary']);
+    Route::get('reports/by-category', [ReportController::class, 'byCategory']);
+    Route::get('reports/by-account', [ReportController::class, 'byAccount']);
+    Route::get('reports/monthly-evolution', [ReportController::class, 'monthlyEvolution']);
+    Route::get('reports/savings-rate', [ReportController::class, 'savingsRate']);
+    Route::get('reports/fixed-vs-variable', [ReportController::class, 'fixedVsVariable']);
+    Route::get('reports/credit-limit-evolution', [ReportController::class, 'creditLimitEvolution']);
+    Route::get('reports/future-commitment', [ReportController::class, 'futureCommitment']);
+    Route::get('reports/top-cards', [ReportController::class, 'topCards']);
+
+    // Planning Routes
+    Route::get('reports/budget-vs-actual', [ReportController::class, 'budgetVsActual']);
+    Route::get('reports/budget-consumption', [ReportController::class, 'budgetConsumption']);
+    Route::get('reports/budget-alerts', [ReportController::class, 'budgetAlerts']);
+    Route::get('reports/goals-progress', [ReportController::class, 'goalsProgress']);
 
     // Audit Logs
     Route::get('audit-logs', function (\Illuminate\Http\Request $request) {
