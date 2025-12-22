@@ -155,4 +155,8 @@ class Transaction extends Model
     {
         return $query->whereNotIn('status', ['estornada', 'cancelada']);
     }
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TransactionAttachment::class);
+    }
 }

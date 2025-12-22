@@ -217,6 +217,78 @@ export const useTransactionsStore = defineStore('transactions', () => {
         }
     }
 
+    async function uploadAttachments(transactionId, files) {
+        const uiStore = useUiStore();
+        // Don't set global loading here to avoid blocking UI, or maybe do?
+        // Let's rely on component loading state or passed loading.
+
+        try {
+            const formData = new FormData();
+            files.forEach(file => {
+                formData.append('files[]', file);
+            });
+
+            const response = await axios.post(`/api/transactions/${transactionId}/attachments`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            uiStore.showToast('Anexos enviados com sucesso!', 'success');
+            return { success: true, data: response.data.attachments };
+        } catch (error) {
+            const message = error.response?.data?.message || 'Erro ao enviar anexos';
+            uiStore.showToast(message, 'error');
+            return { success: false };
+        }
+    }
+
+    async function fetchAttachments(transactionId) {
+        try {
+            const response = await axios.get(`/api/transactions/${transactionId}/attachments`);
+            return response.data;
+        } catch (error) {
+            console.error('Erro ao buscar anexos', error);
+            return [];
+        }
+    }
+
+    async function deleteAttachment(attachmentId) {
+        const uiStore = useUiStore();
+        try {
+            await axios.delete(`/api/attachments/${attachmentId}`);
+            uiStore.showToast('Anexo removido com sucesso!', 'success');
+            return { success: true };
+        } catch (error) {
+            const message = error.response?.data?.message || 'Erro ao remover anexo';
+            uiStore.showToast(message, 'error');
+            return { success: false };
+        }
+    }
+
+    async function downloadAttachment(attachmentId, filename) {
+        const uiStore = useUiStore();
+        try {
+            const response = await axios.get(`/api/attachments/${attachmentId}/download`, {
+                responseType: 'blob'
+            });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            return { success: true };
+        } catch (error) {
+            uiStore.showToast('Erro ao baixar anexo', 'error');
+            return { success: false };
+        }
+    }
+
     function setFilters(newFilters) {
         filters.value = { ...filters.value, ...newFilters };
     }
@@ -249,6 +321,10 @@ export const useTransactionsStore = defineStore('transactions', () => {
         partialRefund,
         anticipateTransaction,
         refundByValue,
+        uploadAttachments,
+        fetchAttachments,
+        deleteAttachment,
+        downloadAttachment,
         setFilters,
         clearFilters,
     };

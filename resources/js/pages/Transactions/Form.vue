@@ -284,6 +284,12 @@
                 />
             </div>
 
+            <!-- Section 5: Attachments -->
+            <TransactionAttachments
+                ref="attachmentsComponent"
+                :transaction-id="isEditing ? route.params.id : null"
+            />
+
             <!-- Actions -->
             <div class="flex gap-3">
                 <button type="submit" class="btn-primary flex-1 py-3" :disabled="loading">
@@ -306,6 +312,7 @@ import { useAccountsStore } from '@/stores/accounts';
 import { useCardsStore } from '@/stores/cards';
 import { useCategoriesStore } from '@/stores/categories';
 import MoneyInput from '@/components/Common/MoneyInput.vue';
+import TransactionAttachments from '@/components/Transactions/TransactionAttachments.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -317,6 +324,7 @@ const categoriesStore = useCategoriesStore();
 const isEditing = computed(() => !!route.params.id);
 const loading = ref(false);
 const originalTransaction = ref(null);
+const attachmentsComponent = ref(null);
 
 const hasPaidInstallments = computed(() => {
     if (!originalTransaction.value || !originalTransaction.value.card_installments) return false;
@@ -378,6 +386,10 @@ async function handleSubmit() {
         }
         
         if (result.success) {
+            if (attachmentsComponent.value && attachmentsComponent.value.hasQueuedFiles()) {
+                const newId = isEditing.value ? route.params.id : result.data.id;
+                await attachmentsComponent.value.uploadQueuedFiles(newId);
+            }
             router.push('/transactions');
         }
     } finally {

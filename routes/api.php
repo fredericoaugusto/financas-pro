@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\CardController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\TransactionController;
+use App\Http\Controllers\Api\TransactionAttachmentController;
 use App\Http\Controllers\Api\RecurringTransactionController;
 use App\Http\Controllers\Api\BudgetController;
 use App\Http\Controllers\Api\GoalController;
@@ -53,6 +54,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('transactions/{transaction}/anticipate', [TransactionController::class, 'anticipate']);
     Route::post('transactions/{transaction}/refund-by-value', [TransactionController::class, 'refundByValue']);
     Route::patch('transactions/{transaction}/notes', [TransactionController::class, 'updateNotes']);
+
+    // Attachments
+    Route::get('transactions/{transaction}/attachments', [TransactionAttachmentController::class, 'index']);
+    Route::post('transactions/{transaction}/attachments', [TransactionAttachmentController::class, 'store']);
+    Route::get('attachments/{attachment}/download', [TransactionAttachmentController::class, 'download']);
+    Route::delete('attachments/{attachment}', [TransactionAttachmentController::class, 'destroy']);
 
     // Recurring Transactions (Recorrências)
     Route::apiResource('recurring-transactions', RecurringTransactionController::class);

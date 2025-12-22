@@ -27,5 +27,8 @@ class AppServiceProvider extends ServiceProvider
         CardInvoice::observe(AuditObserver::class);
         Card::observe(AuditObserver::class);
         \App\Models\Account::observe(AuditObserver::class);
+
+        \Illuminate\Support\Facades\Gate::policy(Transaction::class, \App\Policies\TransactionPolicy::class);
+        \Illuminate\Support\Facades\Gate::policy(\App\Models\TransactionAttachment::class, \App\Policies\TransactionAttachmentPolicy::class);
     }
 }

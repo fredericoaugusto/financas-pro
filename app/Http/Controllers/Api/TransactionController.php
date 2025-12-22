@@ -182,7 +182,7 @@ class TransactionController extends Controller
             'status' => 'confirmada',
         ]);
 
-        AuditLog::log('create', 'Transaction', $transaction->id);
+
 
         return response()->json([
             'message' => 'Lançamento criado com sucesso!',
@@ -246,12 +246,7 @@ class TransactionController extends Controller
         // Delegate to service
         $transaction = $this->transactionService->updateTransaction($transaction, $validated);
 
-        // Logs are handled by Observer (update) + Service (create credit/installments)
-        // Controller specific log:
-        AuditLog::log('update', 'Transaction', $transaction->id, [
-            'old' => $oldData,
-            'new' => $validated,
-        ]);
+
 
         return response()->json([
             'message' => 'Lançamento atualizado com sucesso!',
@@ -275,7 +270,7 @@ class TransactionController extends Controller
             $transaction->delete();
         }
 
-        AuditLog::log('delete', 'Transaction', $transaction->id);
+
 
         return response()->json([
             'message' => 'Lançamento removido com sucesso!',

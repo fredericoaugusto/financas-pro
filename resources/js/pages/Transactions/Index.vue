@@ -354,6 +354,15 @@
                             <div v-else class="text-center py-4 text-gray-500">
                                 {{ selectedTransaction.total_installments }}x de {{ formatCurrency(selectedTransaction.installment_value || selectedTransaction.value / selectedTransaction.total_installments) }}
                             </div>
+                            </div>
+
+
+                        <!-- Attachments section -->
+                        <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                            <h4 class="font-semibold text-gray-900 dark:text-white mb-3">Anexos</h4>
+                            <TransactionAttachments 
+                                :transaction-id="selectedTransaction.id"
+                            />
                         </div>
 
                         <!-- Timeline -->
@@ -550,6 +559,7 @@ import { useAccountsStore } from '@/stores/accounts';
 import { useCardsStore } from '@/stores/cards';
 import Timeline from '@/components/Common/Timeline.vue';
 import AnticipateModal from '@/components/Transactions/AnticipateModal.vue';
+import TransactionAttachments from '@/components/Transactions/TransactionAttachments.vue';
 
 const route = useRoute();
 const router = useRouter();
