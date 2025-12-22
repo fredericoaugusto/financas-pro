@@ -344,12 +344,49 @@
                         </div>
                     </div>
 
-                    <div class="flex gap-3 mt-6">
-                        <button @click="showDetailModal = false" class="btn-secondary flex-1">
-                            Fechar
-                        </button>
-                        <button @click="router.push(`/transactions/${selectedTransaction.id}/edit`)" class="btn-primary flex-1">
-                            Editar
+                    <!-- Action buttons -->
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-6 space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <RouterLink 
+                                :to="`/transactions/${selectedTransaction.id}/edit`" 
+                                class="btn-primary justify-center"
+                                @click="showDetailModal = false"
+                            >
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Editar
+                            </RouterLink>
+                            <button @click="openDuplicateFromModal" class="btn-secondary justify-center">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                Duplicar
+                            </button>
+                        </div>
+                        <div v-if="selectedTransaction.payment_method === 'credito'" class="grid grid-cols-2 gap-3">
+                            <button @click="openRefundFromModal" class="btn-outline justify-center text-orange-600 border-orange-600 hover:bg-orange-50">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                                Estornar
+                            </button>
+                            <button 
+                                v-if="selectedTransaction.total_installments > 1"
+                                @click="openAnticipateFromModal" 
+                                class="btn-outline justify-center text-purple-600 border-purple-600 hover:bg-purple-50"
+                            >
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Antecipar
+                            </button>
+                        </div>
+                        <button @click="openDeleteFromModal" class="btn-danger w-full justify-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Excluir Lançamento
                         </button>
                     </div>
                 </div>
@@ -631,6 +668,33 @@ function openDeleteConfirm(transaction) {
 function openAnticipateModal(transaction) {
     transactionToAnticipate.value = transaction;
     showAnticipateModal.value = true;
+}
+
+// Helper functions to open action modals from detail modal
+function openDuplicateFromModal() {
+    transactionToAction.value = selectedTransaction.value;
+    showDetailModal.value = false;
+    showDuplicateModal.value = true;
+}
+
+function openRefundFromModal() {
+    transactionToAction.value = selectedTransaction.value;
+    refundType.value = 'cancel';
+    refundValue.value = selectedTransaction.value.value;
+    showDetailModal.value = false;
+    showRefundModal.value = true;
+}
+
+function openAnticipateFromModal() {
+    transactionToAnticipate.value = selectedTransaction.value;
+    showDetailModal.value = false;
+    showAnticipateModal.value = true;
+}
+
+function openDeleteFromModal() {
+    transactionToAction.value = selectedTransaction.value;
+    showDetailModal.value = false;
+    showDeleteModal.value = true;
 }
 
 async function handleDuplicate() {

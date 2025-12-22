@@ -69,15 +69,16 @@ class Card extends Model
     }
 
     /**
-     * Calcula o limite usado = soma de todas as parcelas não pagas
+     * Calcula o limite usado = soma do valor restante de todas as faturas não pagas
+     * (total_value - paid_value) de faturas com status != 'paga'
      */
     public function getUsedLimitAttribute(): float
     {
-        return CardInstallment::whereHas('transaction', function ($q) {
-            $q->where('card_id', $this->id);
-        })
-            ->whereNotIn('status', ['paga', 'estornada'])
-            ->sum('value');
+        // SQLite não tem GREATEST, usar CASE WHEN para compatibilidade
+        return $this->invoices()
+            ->whereIn('status', ['aberta', 'parcialmente_paga', 'fechada', 'vencida'])
+            ->selectRaw('SUM(CASE WHEN total_value > paid_value THEN total_value - paid_value ELSE 0 END) as remaining')
+            ->value('remaining') ?? 0;
     }
 
     /**
@@ -97,5 +98,31 @@ class Card extends Model
             ->where('status', 'aberta')
             ->orderBy('reference_month', 'desc')
             ->first();
+    }
+
+    /**
+     * Verifica se o cartão está arquivado
+     */
+    public function isArchived(): bool
+    {
+        return $this->status === 'arquivado';
+    }
+
+    /**
+     * Arquiva o cartão (não exclui)
+     */
+    public function archive(): void
+    {
+        $this->status = 'arquivado';
+        $this->save();
+    }
+
+    /**
+     * Verifica se o cartão pode ser excluído fisicamente
+     * (apenas se não tiver lançamentos)
+     */
+    public function canBeDeleted(): bool
+    {
+        return $this->transactions()->count() === 0;
     }
 }

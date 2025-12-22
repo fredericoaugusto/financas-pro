@@ -94,10 +94,21 @@ export const useCardsStore = defineStore('cards', () => {
         uiStore.setLoading(true);
 
         try {
-            await axios.delete(`/api/cards/${id}`);
-            cards.value = cards.value.filter(c => c.id !== id);
-            uiStore.showToast('Cartão removido com sucesso!', 'success');
-            return { success: true };
+            const response = await axios.delete(`/api/cards/${id}`);
+
+            // If archived, update card status locally instead of removing
+            if (response.data.archived) {
+                const index = cards.value.findIndex(c => c.id === id);
+                if (index !== -1) {
+                    cards.value[index].status = 'arquivado';
+                }
+                uiStore.showToast('Cartão arquivado com sucesso!', 'success');
+            } else {
+                // Actually deleted - remove from list
+                cards.value = cards.value.filter(c => c.id !== id);
+                uiStore.showToast('Cartão removido com sucesso!', 'success');
+            }
+            return { success: true, archived: response.data.archived };
         } catch (error) {
             const message = error.response?.data?.message || 'Erro ao remover cartão';
             uiStore.showToast(message, 'error');
@@ -125,9 +136,9 @@ export const useCardsStore = defineStore('cards', () => {
     async function fetchInvoices(cardId) {
         loading.value = true;
         try {
+            // Fetch ALL invoices including paid ones for complete history
             const response = await axios.get(`/api/cards/${cardId}/invoices`, {
                 params: {
-                    upcoming: true,
                     sort_dir: 'asc'
                 }
             });
@@ -147,11 +158,36 @@ export const useCardsStore = defineStore('cards', () => {
         uiStore.setLoading(true);
 
         try {
+            // data should include: amount, account_id, invoice_id
             const response = await axios.post(`/api/cards/${cardId}/pay`, data);
             uiStore.showToast('Pagamento registrado com sucesso!', 'success');
+            // Refresh invoices to reflect payment
+            await fetchInvoices(cardId);
             return { success: true, data: response.data.data };
         } catch (error) {
             const message = error.response?.data?.message || 'Erro ao registrar pagamento';
+            uiStore.showToast(message, 'error');
+            return { success: false };
+        } finally {
+            uiStore.setLoading(false);
+        }
+    }
+
+    async function unarchiveCard(id) {
+        const uiStore = useUiStore();
+        uiStore.setLoading(true);
+
+        try {
+            const response = await axios.post(`/api/cards/${id}/unarchive`);
+            // Update card status locally
+            const index = cards.value.findIndex(c => c.id === id);
+            if (index !== -1) {
+                cards.value[index] = response.data.data;
+            }
+            uiStore.showToast('Cartão reativado com sucesso!', 'success');
+            return { success: true };
+        } catch (error) {
+            const message = error.response?.data?.message || 'Erro ao reativar cartão';
             uiStore.showToast(message, 'error');
             return { success: false };
         } finally {
@@ -172,6 +208,7 @@ export const useCardsStore = defineStore('cards', () => {
         createCard,
         updateCard,
         deleteCard,
+        unarchiveCard,
         fetchCurrentInvoice,
         fetchInvoices,
         payInvoice,

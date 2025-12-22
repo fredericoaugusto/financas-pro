@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Card;
 use App\Models\CardInvoice;
+use App\Models\CardInstallment;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -44,11 +45,11 @@ class InvoiceService
             ->where('reference_month', $invoiceDetails['reference_month'])
             ->first();
 
-        // 3. Se existe e está PAGA/FECHADA, pular para o próximo mês
-        // A regra é: nunca lançar em fatura paga/fechada.
-        if ($invoice && in_array($invoice->status, ['paga', 'fechada'])) {
+        // 3. Se existe e está FECHADA, pular para o próximo mês
+        // REGRA: Faturas abertas podem receber lançamentos mesmo se pagas antecipadamente
+        // Apenas faturas FECHADAS (após data de fechamento) não recebem mais lançamentos
+        if ($invoice && $invoice->status === 'fechada') {
             // Recalcular para o mês seguinte (compra processada na próxima fatura)
-            // Apenas recalcula data base somando 1 mês
             $invoiceDetails = $this->calculateInvoiceDetails($card, $transactionDate->copy()->addMonth());
 
             // Verificar novamente se existe
@@ -237,6 +238,10 @@ class InvoiceService
                 'status' => 'confirmada',
             ]);
 
+            // Marcar parcelas como pagas para liberar limite do cartão
+            // Proporcionalmente ao valor pago (quando pagamento cobre parcela totalmente)
+            $this->markInstallmentsAsPaid($invoice);
+
             // Capture After State and Log
             $after = $invoice->fresh()->only(['paid_value', 'status']);
             $this->auditService->log('pay_invoice', $invoice, [
@@ -247,6 +252,21 @@ class InvoiceService
             return $transaction;
         });
     }
+
+    /**
+     * Marca parcelas como pagas proporcionalmente ao valor pago
+     */
+    private function markInstallmentsAsPaid(CardInvoice $invoice): void
+    {
+        // Se o pagamento cobre o total da fatura, marca todas as parcelas como pagas
+        // Isso inclui 'antecipada' porque essas parcelas também consomem limite
+        if ($invoice->paid_value >= $invoice->total_value) {
+            CardInstallment::where('invoice_id', $invoice->id)
+                ->whereNotIn('status', ['paga', 'estornada'])
+                ->update(['status' => 'paga']);
+        }
+    }
+
 
     /**
      * Formata o mês de referência para exibição

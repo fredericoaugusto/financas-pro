@@ -40,6 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('cards/{card}/invoice', [CardController::class, 'currentInvoice']);
     Route::get('cards/{card}/invoices', [CardController::class, 'invoices']);
     Route::post('cards/{card}/pay', [CardController::class, 'payInvoice']);
+    Route::post('cards/{card}/unarchive', [CardController::class, 'unarchive']);
 
     // Transactions
     Route::apiResource('transactions', TransactionController::class);

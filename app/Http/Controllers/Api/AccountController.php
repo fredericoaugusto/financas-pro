@@ -58,7 +58,7 @@ class AccountController extends Controller
             'status' => 'active',
         ]);
 
-        AuditLog::log('create', 'Account', $account->id);
+        // Note: AuditObserver automatically logs 'create' event
 
         return response()->json([
             'message' => 'Conta criada com sucesso!',
@@ -112,10 +112,7 @@ class AccountController extends Controller
         $oldData = $account->toArray();
         $account->update($validated);
 
-        AuditLog::log('update', 'Account', $account->id, [
-            'old' => $oldData,
-            'new' => $validated,
-        ]);
+        // Note: AuditObserver automatically logs 'update' event
 
         return response()->json([
             'message' => 'Conta atualizada com sucesso!',

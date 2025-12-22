@@ -78,19 +78,27 @@ class CardInvoice extends Model
     }
 
     /**
-     * Atualiza o status da fatura baseado nos valores
+     * Atualiza o status da fatura baseado nos valores e data de fechamento
+     * REGRA: Fatura só pode ser 'paga' após o fechamento (closing_date)
+     * Pagamentos em faturas abertas são pagamentos antecipados (mantém 'aberta')
      */
     public function updateStatus(): void
     {
-        if ($this->paid_value >= $this->total_value && $this->total_value > 0) {
-            $this->status = 'paga';
-        } elseif ($this->paid_value > 0) {
-            $this->status = 'parcialmente_paga';
-        } elseif ($this->due_date < now() && $this->paid_value < $this->total_value) {
-            $this->status = 'vencida';
-        } elseif ($this->closing_date <= now()) {
-            $this->status = 'fechada';
+        $isClosed = $this->closing_date <= now();
+
+        if ($isClosed) {
+            // Fatura fechada - pode ser marcada como paga se totalmente paga
+            if ($this->paid_value >= $this->total_value && $this->total_value > 0) {
+                $this->status = 'paga';
+            } elseif ($this->paid_value > 0) {
+                $this->status = 'parcialmente_paga';
+            } elseif ($this->due_date < now()) {
+                $this->status = 'vencida';
+            } else {
+                $this->status = 'fechada';
+            }
         } else {
+            // Fatura ainda aberta - mantém 'aberta' mesmo com pagamentos antecipados
             $this->status = 'aberta';
         }
     }

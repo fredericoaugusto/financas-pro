@@ -38,12 +38,15 @@
                         </p>
                     </div>
                     <div class="text-right">
-                        <p class="text-sm text-gray-500">Valor total</p>
-                        <p class="text-3xl font-bold text-gray-900 dark:text-white">
-                            {{ formatCurrency(selectedInvoice.total_value) }}
+                        <p class="text-sm text-gray-500">Valor a pagar</p>
+                        <p class="text-3xl font-bold" :class="remainingValue > 0 ? 'text-gray-900 dark:text-white' : 'text-green-600 dark:text-green-400'">
+                            {{ formatCurrency(Math.max(0, remainingValue)) }}
                         </p>
                         <p v-if="selectedInvoice.paid_value > 0" class="text-sm text-green-600">
                             Pago: {{ formatCurrency(selectedInvoice.paid_value) }}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            Total: {{ formatCurrency(selectedInvoice.total_value) }}
                         </p>
                     </div>
                 </div>
@@ -67,8 +70,9 @@
                     <div
                         v-for="item in selectedInvoice.items"
                         :key="item.id"
-                        class="flex items-center justify-between p-4 rounded-lg"
+                        class="flex items-center justify-between p-4 rounded-lg cursor-pointer transition-all hover:ring-2 hover:ring-primary-500"
                         :class="item.value < 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-800/50'"
+                        @click="openItemDetail(item)"
                     >
                         <div class="flex items-center gap-3">
                             <!-- Icon: green for credit/refund, red for debit -->
@@ -144,11 +148,14 @@
                                     <span :class="['badge', getStatusBadgeClass(invoice.status)]">{{ getStatusLabel(invoice.status) }}</span>
                                 </div>
                                 <div class="text-right">
-                                    <span class="font-semibold text-gray-900 dark:text-white animate-pulse">
-                                        {{ formatCurrency(invoice.total_value) }}
+                                    <span class="font-semibold text-gray-900 dark:text-white">
+                                        {{ formatCurrency(invoice.total_value - invoice.paid_value) }}
                                     </span>
-                                    <p v-if="invoice.remaining_value > 0" class="text-xs text-orange-600 font-bold">
-                                        Restante: {{ formatCurrency(invoice.remaining_value) }}
+                                    <p v-if="invoice.paid_value > 0" class="text-xs text-green-600 font-medium">
+                                        Pago: {{ formatCurrency(invoice.paid_value) }}
+                                    </p>
+                                    <p class="text-xs text-gray-500">
+                                        Total: {{ formatCurrency(invoice.total_value) }}
                                     </p>
                                 </div>
                             </div>
@@ -176,8 +183,14 @@
                                 </div>
                                 <div class="text-right">
                                     <span class="font-semibold text-gray-900 dark:text-white">
-                                        {{ formatCurrency(invoice.total_value) }}
+                                        {{ formatCurrency(Math.max(0, invoice.total_value - invoice.paid_value)) }}
                                     </span>
+                                    <p v-if="invoice.paid_value > 0" class="text-xs text-green-600 font-medium">
+                                        Pago: {{ formatCurrency(invoice.paid_value) }}
+                                    </p>
+                                    <p v-if="invoice.total_value !== invoice.paid_value" class="text-xs text-gray-500">
+                                        Total: {{ formatCurrency(invoice.total_value) }}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -292,25 +305,256 @@
                 </div>
             </div>
         </Teleport>
+
+        <!-- Full Transaction Detail Modal -->
+        <Teleport to="body">
+            <div v-if="showItemModal && selectedTransaction" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showItemModal = false">
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">Detalhes do Lançamento</h3>
+                        <button @click="showItemModal = false" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Loading state -->
+                    <div v-if="loadingTransaction" class="flex justify-center py-8">
+                        <svg class="animate-spin h-8 w-8 text-primary-600" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+
+                    <div v-else class="space-y-4">
+                        <!-- Value display -->
+                        <div class="text-center py-4">
+                            <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 flex items-center justify-center mx-auto mb-3">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                                </svg>
+                            </div>
+                            <p class="text-3xl font-bold text-red-600 dark:text-red-400">
+                                -{{ formatCurrency(selectedTransaction.value) }}
+                            </p>
+                            <p class="text-gray-500">{{ selectedTransaction.description }}</p>
+                        </div>
+
+                        <!-- Transaction details -->
+                        <div class="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4">
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">Tipo</span>
+                                <span class="font-medium text-gray-900 dark:text-white capitalize">{{ selectedTransaction.type }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">Data</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ formatDate(selectedTransaction.date) }}</span>
+                            </div>
+                            <div v-if="selectedTransaction.category" class="flex justify-between">
+                                <span class="text-gray-500">Categoria</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ selectedTransaction.category.name }}</span>
+                            </div>
+                            <div v-if="selectedTransaction.card" class="flex justify-between">
+                                <span class="text-gray-500">Cartão</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ selectedTransaction.card.name }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Installments section -->
+                        <div v-if="selectedTransaction.total_installments > 1" class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                            <h4 class="font-semibold text-gray-900 dark:text-white mb-3">
+                                Parcelamento ({{ selectedTransaction.total_installments }}x)
+                            </h4>
+                            <div v-if="selectedTransaction.card_installments?.length" class="space-y-2 max-h-40 overflow-y-auto">
+                                <div
+                                    v-for="installment in selectedTransaction.card_installments"
+                                    :key="installment.id"
+                                    class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50"
+                                >
+                                    <div>
+                                        <p class="font-medium text-gray-900 dark:text-white">
+                                            Parcela {{ installment.installment_number }}/{{ installment.total_installments }}
+                                        </p>
+                                        <p class="text-xs text-gray-500">
+                                            {{ installment.invoice ? `Fatura ${formatMonth(installment.invoice.reference_month)}` : 'Sem fatura' }}
+                                        </p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-semibold text-gray-900 dark:text-white">
+                                            {{ formatCurrency(installment.value) }}
+                                        </p>
+                                        <span :class="getInstallmentBadgeClass(installment.status)">
+                                            {{ getInstallmentStatusLabel(installment.status) }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-else class="text-center py-4 text-gray-500">
+                                {{ selectedTransaction.total_installments }}x de {{ formatCurrency(selectedTransaction.installment_value || selectedTransaction.value / selectedTransaction.total_installments) }}
+                            </div>
+                        </div>
+
+                        <!-- Timeline -->
+                        <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                            <h4 class="font-semibold text-gray-900 dark:text-white mb-3">Histórico de Ações</h4>
+                            <Timeline entityType="Transaction" :entityId="selectedTransaction.id" />
+                        </div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div v-if="!loadingTransaction" class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-6 space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <RouterLink 
+                                :to="`/transactions/${selectedTransaction.id}/edit`" 
+                                class="btn-primary justify-center"
+                                @click="showItemModal = false"
+                            >
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Editar
+                            </RouterLink>
+                            <button @click="openDuplicateModal" class="btn-secondary justify-center">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                Duplicar
+                            </button>
+                        </div>
+                        <div v-if="selectedTransaction.payment_method === 'credito'" class="grid grid-cols-2 gap-3">
+                            <button @click="openRefundModal" class="btn-outline justify-center text-orange-600 border-orange-600 hover:bg-orange-50">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                                Estornar
+                            </button>
+                            <button 
+                                v-if="selectedTransaction.total_installments > 1"
+                                @click="openAnticipateModal" 
+                                class="btn-outline justify-center text-purple-600 border-purple-600 hover:bg-purple-50"
+                            >
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Antecipar
+                            </button>
+                        </div>
+                        <button @click="openDeleteModal" class="btn-danger w-full justify-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Excluir Lançamento
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- Duplicate Confirmation Modal -->
+        <Teleport to="body">
+            <div v-if="showDuplicateModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full animate-slide-up">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Duplicar Lançamento</h3>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">
+                        Deseja duplicar o lançamento <strong>"{{ selectedTransaction?.description }}"</strong>?
+                    </p>
+                    <div class="flex gap-3">
+                        <button @click="showDuplicateModal = false" class="btn-secondary flex-1">
+                            Cancelar
+                        </button>
+                        <button @click="handleDuplicate" class="btn-primary flex-1">
+                            Duplicar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- Delete Confirmation Modal -->
+        <Teleport to="body">
+            <div v-if="showDeleteModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full animate-slide-up">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Excluir Lançamento</h3>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">
+                        Tem certeza que deseja excluir <strong>"{{ selectedTransaction?.description }}"</strong>? Esta ação não pode ser desfeita.
+                    </p>
+                    <div class="flex gap-3">
+                        <button @click="showDeleteModal = false" class="btn-secondary flex-1">
+                            Cancelar
+                        </button>
+                        <button @click="handleDelete" class="btn-danger flex-1">
+                            Excluir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- Refund Modal -->
+        <Teleport to="body">
+            <div v-if="showRefundModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full animate-slide-up">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Estornar Lançamento</h3>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">
+                        <strong>"{{ selectedTransaction?.description }}"</strong>
+                        <span class="block text-sm mt-1">Valor total: {{ formatCurrency(selectedTransaction?.value) }}</span>
+                    </p>
+                    <div class="flex gap-3">
+                        <button @click="showRefundModal = false" class="btn-secondary flex-1">
+                            Cancelar
+                        </button>
+                        <button @click="handleRefund" class="btn-danger flex-1">
+                            Estornar Tudo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- Anticipate Modal -->
+        <AnticipateModal 
+            v-if="showAnticipateModal && selectedTransaction"
+            :transactionId="selectedTransaction.id"
+            @close="showAnticipateModal = false"
+            @success="handleAnticipateSuccess"
+        />
     </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRoute, RouterLink } from 'vue-router';
+import { useRoute, RouterLink, useRouter } from 'vue-router';
 import { useCardsStore } from '@/stores/cards';
 import { useAccountsStore } from '@/stores/accounts';
+import { useTransactionsStore } from '@/stores/transactions';
 import MoneyInput from '@/components/Common/MoneyInput.vue';
+import Timeline from '@/components/Common/Timeline.vue';
+import AnticipateModal from '@/components/Transactions/AnticipateModal.vue';
+import axios from 'axios';
 
 const route = useRoute();
+const router = useRouter();
 const cardsStore = useCardsStore();
 const accountsStore = useAccountsStore();
+const transactionsStore = useTransactionsStore();
 
 const showPayModal = ref(false);
 const paymentAmount = ref(0);
 const paymentAccountId = ref('');
 const isFullPayment = ref(true);
 const selectedInvoice = ref(null);
+
+// Transaction modal state
+const showItemModal = ref(false);
+const selectedTransaction = ref(null);
+const loadingTransaction = ref(false);
+
+// Action modals
+const showDuplicateModal = ref(false);
+const showDeleteModal = ref(false);
+const showRefundModal = ref(false);
+const showAnticipateModal = ref(false);
 
 const accounts = computed(() => accountsStore.accounts);
 
@@ -384,6 +628,112 @@ function getInstallmentStatusLabel(status) {
     return labels[status] || status;
 }
 
+function getInstallmentBadgeClass(status) {
+    const classes = {
+        pendente: 'text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600',
+        em_fatura: 'text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-600',
+        paga: 'text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-600',
+        estornada: 'text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600',
+        antecipada: 'text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-600',
+    };
+    return classes[status] || classes.pendente;
+}
+
+async function openItemDetail(item) {
+    if (!item.transaction_id) return;
+    
+    showItemModal.value = true;
+    loadingTransaction.value = true;
+    
+    try {
+        const response = await axios.get(`/api/transactions/${item.transaction_id}`);
+        selectedTransaction.value = response.data.data;
+    } catch (error) {
+        console.error('Error fetching transaction:', error);
+        showItemModal.value = false;
+    } finally {
+        loadingTransaction.value = false;
+    }
+}
+
+// Action modal openers
+function openDuplicateModal() {
+    showItemModal.value = false;
+    showDuplicateModal.value = true;
+}
+
+function openDeleteModal() {
+    showItemModal.value = false;
+    showDeleteModal.value = true;
+}
+
+function openRefundModal() {
+    showItemModal.value = false;
+    showRefundModal.value = true;
+}
+
+function openAnticipateModal() {
+    showItemModal.value = false;
+    showAnticipateModal.value = true;
+}
+
+// Action handlers
+async function handleDuplicate() {
+    if (selectedTransaction.value) {
+        await transactionsStore.duplicateTransaction(selectedTransaction.value.id);
+        showDuplicateModal.value = false;
+        await cardsStore.fetchInvoices(route.params.id);
+        if (selectedInvoice.value) {
+            await cardsStore.fetchCurrentInvoice(route.params.id);
+            // Refresh selected invoice
+            const updated = cardsStore.invoices.find(i => i.id === selectedInvoice.value.id);
+            if (updated) selectedInvoice.value = updated;
+        }
+    }
+}
+
+async function handleDelete() {
+    if (selectedTransaction.value) {
+        await transactionsStore.deleteTransaction(selectedTransaction.value.id);
+        showDeleteModal.value = false;
+        selectedTransaction.value = null;
+        await cardsStore.fetchInvoices(route.params.id);
+        await cardsStore.fetchCurrentInvoice(route.params.id);
+        // Refresh selected invoice
+        if (selectedInvoice.value) {
+            const updated = cardsStore.invoices.find(i => i.id === selectedInvoice.value.id);
+            if (updated) selectedInvoice.value = updated;
+        }
+    }
+}
+
+async function handleRefund() {
+    if (selectedTransaction.value) {
+        await transactionsStore.refundTransaction(selectedTransaction.value.id);
+        showRefundModal.value = false;
+        selectedTransaction.value = null;
+        await cardsStore.fetchInvoices(route.params.id);
+        await cardsStore.fetchCurrentInvoice(route.params.id);
+        // Refresh selected invoice
+        if (selectedInvoice.value) {
+            const updated = cardsStore.invoices.find(i => i.id === selectedInvoice.value.id);
+            if (updated) selectedInvoice.value = updated;
+        }
+    }
+}
+
+async function handleAnticipateSuccess() {
+    showAnticipateModal.value = false;
+    selectedTransaction.value = null;
+    await cardsStore.fetchInvoices(route.params.id);
+    await cardsStore.fetchCurrentInvoice(route.params.id);
+    // Refresh selected invoice
+    if (selectedInvoice.value) {
+        const updated = cardsStore.invoices.find(i => i.id === selectedInvoice.value.id);
+        if (updated) selectedInvoice.value = updated;
+    }
+}
+
 function selectFullPayment() {
     isFullPayment.value = true;
     paymentAmount.value = remainingValue.value;
@@ -427,11 +777,12 @@ function selectInvoice(invoice) {
 async function handlePayInvoice() {
     const amount = isFullPayment.value ? remainingValue.value : paymentAmount.value;
     
-    if (!paymentAccountId.value || amount <= 0) return;
+    if (!paymentAccountId.value || amount <= 0 || !selectedInvoice.value) return;
     
     await cardsStore.payInvoice(route.params.id, {
         amount: amount,
         account_id: paymentAccountId.value,
+        invoice_id: selectedInvoice.value.id,
     });
     
     showPayModal.value = false;

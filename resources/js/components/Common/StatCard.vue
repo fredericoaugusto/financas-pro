@@ -1,5 +1,5 @@
 <template>
-    <div :class="['stat-card transition-all', clickable ? 'hover:shadow-lg hover:scale-[1.02] cursor-pointer' : '']">
+    <div :class="['stat-card h-full transition-all', clickable ? 'hover:shadow-lg hover:scale-[1.02] cursor-pointer' : '']">
         <div class="flex items-start justify-between">
             <div>
                 <p class="stat-label">{{ title }}</p>

@@ -67,7 +67,12 @@ class CategoryController extends Controller
             ], 403);
         }
 
-        $this->authorize('update', $category);
+        // Verificar propriedade
+        if ($category->user_id !== $request->user()->id) {
+            return response()->json([
+                'message' => 'Não autorizado.',
+            ], 403);
+        }
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
@@ -102,7 +107,21 @@ class CategoryController extends Controller
             ], 403);
         }
 
-        $this->authorize('delete', $category);
+        // Verificar propriedade
+        if ($category->user_id !== $request->user()->id) {
+            return response()->json([
+                'message' => 'Não autorizado.',
+            ], 403);
+        }
+
+        // Verificar se categoria está em uso
+        $transactionsCount = $category->transactions()->count();
+        if ($transactionsCount > 0) {
+            return response()->json([
+                'message' => "Esta categoria possui {$transactionsCount} lançamento(s) vinculados. Remova os lançamentos primeiro ou desative a categoria.",
+                'transactions_count' => $transactionsCount,
+            ], 422);
+        }
 
         $category->delete();
 

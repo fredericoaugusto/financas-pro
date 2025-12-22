@@ -15,18 +15,22 @@ class AuditObserver
 
     public function updated(Model $model)
     {
-        // Ignore timestamps updates only? No, log everything for now
         $changes = $model->getChanges();
 
-        // Remove updated_at/created_at noise if only those changed?
-        // But for critical models, every update matters.
-        // We can capture original/changes.
+        // Skip logging if only timestamps or archived_at changed
+        // (archive/unarchive actions are logged separately by services/controllers)
+        $ignoredFields = ['updated_at', 'created_at', 'archived_at'];
+        $significantChanges = array_diff_key($changes, array_flip($ignoredFields));
+
+        if (empty($significantChanges)) {
+            return;
+        }
 
         $original = $model->getOriginal();
 
         $this->logAction('update', $model, [
-            'changes' => $changes,
-            'original' => array_intersect_key($original, $changes)
+            'changes' => $significantChanges,
+            'original' => array_intersect_key($original, $significantChanges)
         ]);
     }
 

@@ -105,9 +105,15 @@ function getActionIconClass(action) {
         update: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
         delete: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
         archive: 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400',
+        unarchive: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
         refund: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
         pay_invoice: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+        early_payment: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400',
+        payment: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
         duplicate: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400',
+        anticipate_installments: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
+        refund_by_value: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
+        edit_notes: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',
     };
     return classes[action] || 'bg-gray-100 text-gray-600';
 }
@@ -118,13 +124,19 @@ function getActionLabel(action) {
         update: 'Atualizado',
         delete: 'Excluído',
         archive: 'Arquivado',
+        unarchive: 'Reativado',
         refund: 'Estornado',
         partial_refund: 'Estorno Parcial',
         pay_invoice: 'Fatura Paga',
+        early_payment: 'Pagamento Antecipado',
+        payment: 'Pagamento',
         duplicate: 'Duplicado',
         create_credit_purchase: 'Compra no Crédito',
         create_transfer: 'Transferência',
         create_installment: 'Compra Parcelada',
+        anticipate_installments: 'Antecipação de Parcelas',
+        refund_by_value: 'Estorno por Valor',
+        edit_notes: 'Observações Editadas',
     };
     return labels[action] || action;
 }

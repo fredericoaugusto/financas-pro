@@ -117,16 +117,14 @@ class InvoiceTest extends TestCase
         $invoice = $service->getOrCreateInvoice($card, '2025-05-10');
         $this->assertEquals('2025-05', $invoice->reference_month);
 
-        // 2. Pay/Close the invoice manually
-        $invoice->status = 'paga';
+        // 2. Close the invoice (simulating closing date passed)
+        // NOTE: Only 'fechada' invoices block new transactions
+        // 'paga' invoices that are still 'aberta' can receive new transactions
+        $invoice->status = 'fechada';
         $invoice->save();
 
         // 3. Try to add another transaction for May 15 (should be in May invoice usually)
-        // BUT since May is paid, it should roll over to June? 
-        // OR throw error?
-        // Requirement: "Fatura paga não recebe lançamento" -> typically rolls over or creates supplemental.
-        // Let's assume it finds the NEXT open invoice.
-
+        // Since May is CLOSED, it should roll over to June.
         $newInvoice = $service->getOrCreateInvoice($card, '2025-05-15');
 
         $this->assertNotEquals($invoice->id, $newInvoice->id);

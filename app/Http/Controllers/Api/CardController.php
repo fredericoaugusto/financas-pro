@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Card;
+use App\Models\CardInvoice;
 use App\Models\AuditLog;
 use App\Services\InvoiceService;
 use Illuminate\Http\JsonResponse;
@@ -80,7 +81,7 @@ class CardController extends Controller
             'user_id' => $request->user()->id,
         ]);
 
-        AuditLog::log('create', 'Card', $card->id);
+        // Note: AuditObserver automatically logs 'create' event
 
         return response()->json([
             'message' => 'Cartão criado com sucesso!',
@@ -141,10 +142,7 @@ class CardController extends Controller
             app(\App\Services\InvoiceService::class)->reprocessOpenInvoices($card);
         }
 
-        AuditLog::log('update', 'Card', $card->id, [
-            'old' => $oldData,
-            'new' => $validated,
-        ]);
+        // Note: AuditObserver automatically logs 'update' event
 
         return response()->json([
             'message' => 'Cartão atualizado com sucesso!',
@@ -153,7 +151,7 @@ class CardController extends Controller
     }
 
     /**
-     * Remove um cartão (soft delete)
+     * Remove ou arquiva um cartão
      */
     public function destroy(Request $request, Card $card): JsonResponse
     {
@@ -161,12 +159,41 @@ class CardController extends Controller
             return response()->json(['message' => 'Não autorizado.'], 403);
         }
 
-        $card->delete();
+        // Verificar se há faturas abertas com valores a pagar
+        $openInvoicesWithBalance = $card->invoices()
+            ->whereIn('status', ['aberta', 'parcialmente_paga', 'fechada'])
+            ->whereRaw('total_value > paid_value')
+            ->count();
 
-        AuditLog::log('delete', 'Card', $card->id);
+        if ($openInvoicesWithBalance > 0) {
+            return response()->json([
+                'message' => 'Não é possível arquivar este cartão. Existem faturas com valores a pagar. Quite as faturas primeiro.',
+                'open_invoices' => $openInvoicesWithBalance,
+            ], 422);
+        }
+
+        // Verificar se cartão pode ser excluído (sem lançamentos)
+        if ($card->canBeDeleted()) {
+            $card->delete();
+            // Note: AuditObserver handles delete logging
+            return response()->json([
+                'message' => 'Cartão removido com sucesso!',
+                'archived' => false,
+                'deleted' => true,
+            ]);
+        }
+
+        // Tem histórico - arquivar ao invés de deletar
+        $card->archive();
+
+        AuditLog::log('archive', 'Card', $card->id, [
+            'transactions_count' => $card->transactions()->count(),
+        ]);
 
         return response()->json([
-            'message' => 'Cartão removido com sucesso!',
+            'message' => 'Cartão arquivado com sucesso! O histórico de lançamentos foi preservado.',
+            'archived' => true,
+            'deleted' => false,
         ]);
     }
 
@@ -243,22 +270,38 @@ class CardController extends Controller
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
             'account_id' => ['required', 'exists:accounts,id'],
+            'invoice_id' => ['required', 'exists:card_invoices,id'],
         ]);
 
         try {
-            $invoice = $this->invoiceService->getCurrentInvoice($card);
+            // Buscar a fatura específica
+            $invoice = CardInvoice::where('id', $validated['invoice_id'])
+                ->where('card_id', $card->id)
+                ->firstOrFail();
+
+            // Regra: pagamento em fatura ABERTA = pagamento antecipado (crédito)
+            // Pagamento em fatura FECHADA = pagamento normal
+            $isEarlyPayment = $invoice->status === 'aberta';
+
             $transaction = $this->invoiceService->payInvoice($invoice, $validated['amount'], $validated['account_id']);
 
-            AuditLog::log('pay_invoice', 'CardInvoice', $invoice->id, [
+            $paymentType = $isEarlyPayment ? 'early_payment' : 'payment';
+            AuditLog::log($paymentType, 'CardInvoice', $invoice->id, [
                 'amount' => $validated['amount'],
                 'account_id' => $validated['account_id'],
+                'is_early' => $isEarlyPayment,
             ]);
 
+            $message = $isEarlyPayment
+                ? 'Pagamento antecipado registrado! O valor será creditado na fatura.'
+                : 'Pagamento registrado com sucesso!';
+
             return response()->json([
-                'message' => 'Pagamento registrado com sucesso!',
+                'message' => $message,
                 'data' => [
                     'invoice' => $invoice->fresh(),
                     'transaction' => $transaction,
+                    'is_early_payment' => $isEarlyPayment,
                 ],
             ]);
         } catch (\Exception $e) {
@@ -266,5 +309,29 @@ class CardController extends Controller
                 'message' => 'Erro ao registrar pagamento: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Reativa um cartão arquivado
+     */
+    public function unarchive(Request $request, Card $card): JsonResponse
+    {
+        if ($card->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Não autorizado.'], 403);
+        }
+
+        if (!$card->isArchived()) {
+            return response()->json(['message' => 'Este cartão não está arquivado.'], 400);
+        }
+
+        $card->status = 'ativo';
+        $card->save();
+
+        AuditLog::log('unarchive', 'Card', $card->id);
+
+        return response()->json([
+            'message' => 'Cartão reativado com sucesso!',
+            'data' => $card->fresh(),
+        ]);
     }
 }

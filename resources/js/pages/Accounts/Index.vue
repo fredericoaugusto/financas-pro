@@ -199,6 +199,16 @@
                             Ver Extrato Completo
                         </RouterLink>
                         <RouterLink 
+                            :to="`/transactions/create?type=receita&account_id=${selectedAccount.id}`"
+                            class="btn-success w-full justify-center"
+                            @click="showDetailModal = false"
+                        >
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Depositar
+                        </RouterLink>
+                        <RouterLink 
                             :to="`/accounts/${selectedAccount.id}/edit`" 
                             class="btn-secondary w-full justify-center"
                             @click="showDetailModal = false"
@@ -249,6 +259,38 @@
                 </div>
             </div>
         </Teleport>
+
+        <!-- Unarchive Confirmation Modal -->
+        <Teleport to="body">
+            <div v-if="showUnarchiveModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm mx-4 w-full animate-slide-up">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                            Reativar Conta
+                        </h3>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">
+                        Deseja reativar a conta <strong>"{{ accountToUnarchive?.name }}"</strong>?
+                    </p>
+                    <p class="text-sm text-gray-500 mb-4">
+                        A conta voltará a aparecer nas opções de lançamento e seu saldo será considerado novamente.
+                    </p>
+                    <div class="flex gap-3">
+                        <button @click="showUnarchiveModal = false" class="btn-secondary flex-1">
+                            Cancelar
+                        </button>
+                        <button @click="confirmUnarchive" class="btn-success flex-1">
+                            Reativar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
@@ -262,6 +304,8 @@ import Timeline from '@/components/Common/Timeline.vue';
 const accountsStore = useAccountsStore();
 const showDetailModal = ref(false);
 const showDeleteModal = ref(false);
+const showUnarchiveModal = ref(false);
+const accountToUnarchive = ref(null);
 const selectedAccount = ref(null);
 const recentTransactions = ref([]);
 const loadingRecentTransactions = ref(false);
@@ -372,8 +416,15 @@ async function handleDelete() {
 }
 
 async function handleUnarchive(account) {
-    if (confirm(`Deseja reativar a conta "${account.name}"?`)) {
-        await accountsStore.unarchiveAccount(account.id);
+    accountToUnarchive.value = account;
+    showUnarchiveModal.value = true;
+}
+
+async function confirmUnarchive() {
+    if (accountToUnarchive.value) {
+        await accountsStore.unarchiveAccount(accountToUnarchive.value.id);
+        showUnarchiveModal.value = false;
+        accountToUnarchive.value = null;
     }
 }
 

@@ -37,7 +37,7 @@
                             <span class="font-medium text-gray-900 dark:text-white">{{ category.name }}</span>
                         </div>
                         <button
-                            @click="handleDelete(category.id)"
+                            @click="handleDelete(category)"
                             class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                         >
                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,7 +70,7 @@
                             <span class="font-medium text-gray-900 dark:text-white">{{ category.name }}</span>
                         </div>
                         <button
-                            @click="handleDelete(category.id)"
+                            @click="handleDelete(category)"
                             class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                         >
                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,6 +127,33 @@
                 </div>
             </div>
         </Teleport>
+
+        <!-- Delete Confirmation Modal -->
+        <Teleport to="body">
+            <div v-if="showDeleteModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-sm animate-slide-up">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">Excluir Categoria</h3>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">
+                        Tem certeza que deseja excluir a categoria <strong>"{{ categoryToDelete?.name }}"</strong>?
+                    </p>
+                    <div class="flex gap-3">
+                        <button @click="showDeleteModal = false" class="btn-secondary flex-1">
+                            Cancelar
+                        </button>
+                        <button @click="confirmDelete" class="btn-danger flex-1">
+                            Excluir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
@@ -136,6 +163,8 @@ import { useCategoriesStore } from '@/stores/categories';
 
 const categoriesStore = useCategoriesStore();
 const showCreateModal = ref(false);
+const showDeleteModal = ref(false);
+const categoryToDelete = ref(null);
 
 const colors = [
     '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
@@ -167,9 +196,16 @@ async function handleCreate() {
     }
 }
 
-async function handleDelete(id) {
-    if (confirm('Tem certeza que deseja excluir esta categoria?')) {
-        await categoriesStore.deleteCategory(id);
+async function handleDelete(category) {
+    categoryToDelete.value = category;
+    showDeleteModal.value = true;
+}
+
+async function confirmDelete() {
+    if (categoryToDelete.value) {
+        await categoriesStore.deleteCategory(categoryToDelete.value.id);
+        showDeleteModal.value = false;
+        categoryToDelete.value = null;
     }
 }
 

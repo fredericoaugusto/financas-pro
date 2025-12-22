@@ -113,6 +113,13 @@ class TransactionController extends Controller
         if ($validated['payment_method'] === 'credito' && $validated['card_id']) {
             $card = Card::findOrFail($validated['card_id']);
 
+            // Bloquear lançamentos em cartão arquivado
+            if ($card->isArchived()) {
+                return response()->json([
+                    'message' => 'Este cartão está arquivado e não aceita novos lançamentos. Reative-o primeiro.',
+                ], 422);
+            }
+
             $transaction = $this->transactionService->createCreditPurchase(
                 [...$validated, 'user_id' => $userId],
                 $card,
@@ -153,6 +160,14 @@ class TransactionController extends Controller
         // Se vier card_id e método for débito, usamos a conta vinculada ao cartão
         if ($validated['payment_method'] === 'debito' && !empty($validated['card_id'])) {
             $card = Card::findOrFail($validated['card_id']);
+
+            // Bloquear lançamentos em cartão arquivado
+            if ($card->isArchived()) {
+                return response()->json([
+                    'message' => 'Este cartão está arquivado e não aceita novos lançamentos. Reative-o primeiro.',
+                ], 422);
+            }
+
             $validated['account_id'] = $card->account_id;
             // Mantemos o card_id salvo na transação também para referência
         }

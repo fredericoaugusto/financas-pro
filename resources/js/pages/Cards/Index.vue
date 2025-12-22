@@ -25,20 +25,36 @@
             <div
                 v-for="card in cardsStore.cards"
                 :key="card.id"
-                class="relative rounded-2xl p-6 overflow-hidden cursor-pointer transform transition-all hover:scale-[1.02] hover:shadow-xl"
+                class="relative rounded-2xl p-6 overflow-hidden cursor-pointer transform transition-all"
+                :class="[
+                    card.status === 'arquivado' 
+                        ? 'opacity-50 grayscale' 
+                        : 'hover:scale-[1.02] hover:shadow-xl'
+                ]"
                 :style="{ 
                     background: `linear-gradient(135deg, ${card.color || '#6366f1'}, ${adjustColor(card.color || '#6366f1')})`,
                     color: getTextColor(card.color || '#6366f1')
                 }"
                 @click="openCardDetail(card)"
             >
+                <!-- Archived badge -->
+                <div v-if="card.status === 'arquivado'" class="absolute top-4 left-4 flex items-center gap-2">
+                    <span class="badge badge-gray">Arquivado</span>
+                    <button 
+                        @click.stop="handleUnarchive(card)"
+                        class="badge-green cursor-pointer hover:opacity-80"
+                    >
+                        Reativar
+                    </button>
+                </div>
+
                 <!-- Card brand -->
                 <div class="absolute top-4 right-4">
                     <span class="text-sm font-medium uppercase opacity-80">{{ card.brand }}</span>
                 </div>
 
                 <!-- Card name and holder -->
-                <div class="mb-4">
+                <div class="mb-4" :class="{ 'mt-6': card.status === 'arquivado' }">
                     <p class="text-sm opacity-80">{{ card.bank }}</p>
                     <h3 class="text-xl font-bold">{{ card.name }}</h3>
                 </div>
@@ -198,9 +214,14 @@
                                     <p class="text-sm font-medium text-gray-900 dark:text-white">{{ formatMonth(invoice.reference_month) }}</p>
                                     <span :class="['badge', getStatusBadgeClass(invoice.status)]">{{ getStatusLabel(invoice.status) }}</span>
                                 </div>
-                                <span class="font-semibold text-gray-900 dark:text-white">
-                                    {{ formatCurrency(invoice.total_value) }}
-                                </span>
+                                <div class="text-right">
+                                    <span class="font-semibold text-gray-900 dark:text-white">
+                                        {{ formatCurrency(Math.max(0, invoice.total_value - invoice.paid_value)) }}
+                                    </span>
+                                    <p v-if="invoice.paid_value > 0" class="text-xs text-green-600 font-medium">
+                                        Pago: {{ formatCurrency(invoice.paid_value) }}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                         <div v-else class="text-center py-4 text-gray-500 text-sm">
@@ -259,32 +280,48 @@
 
                     <!-- Actions -->
                     <div class="space-y-3">
-                        <RouterLink 
-                            :to="`/cards/${selectedCard.id}/invoice`" 
-                            class="btn-primary w-full justify-center"
-                            @click="showDetailModal = false"
-                        >
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                            Ver Fatura
-                        </RouterLink>
-                        <RouterLink 
-                            :to="`/cards/${selectedCard.id}/edit`" 
-                            class="btn-secondary w-full justify-center"
-                            @click="showDetailModal = false"
-                        >
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Editar Cartão
-                        </RouterLink>
-                        <button @click="confirmDelete" class="btn-danger w-full justify-center">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Excluir Cartão
-                        </button>
+                        <!-- Archived card: only show reactivate -->
+                        <template v-if="selectedCard.status === 'arquivado'">
+                            <div class="text-center text-sm text-gray-500 mb-2 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                Este cartão está arquivado e não pode ser editado.
+                            </div>
+                            <button @click="handleUnarchiveFromModal" class="btn-success w-full justify-center">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Reativar Cartão
+                            </button>
+                        </template>
+                        
+                        <!-- Active card: show all actions -->
+                        <template v-else>
+                            <RouterLink 
+                                :to="`/cards/${selectedCard.id}/invoice`" 
+                                class="btn-primary w-full justify-center"
+                                @click="showDetailModal = false"
+                            >
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                                Ver Fatura
+                            </RouterLink>
+                            <RouterLink 
+                                :to="`/cards/${selectedCard.id}/edit`" 
+                                class="btn-secondary w-full justify-center"
+                                @click="showDetailModal = false"
+                            >
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Editar Cartão
+                            </RouterLink>
+                            <button @click="confirmDelete" class="btn-danger w-full justify-center">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Excluir/Arquivar Cartão
+                            </button>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -447,8 +484,17 @@ async function handleDelete() {
     }
 }
 
+async function handleUnarchive(card) {
+    await cardsStore.unarchiveCard(card.id);
+}
 
-
+async function handleUnarchiveFromModal() {
+    if (selectedCard.value) {
+        await cardsStore.unarchiveCard(selectedCard.value.id);
+        showDetailModal.value = false;
+        selectedCard.value = null;
+    }
+}
 
 function getDaysUntilDue(input) {
     if (!input) return null;
