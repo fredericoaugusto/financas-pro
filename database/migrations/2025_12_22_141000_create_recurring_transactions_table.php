@@ -22,7 +22,7 @@ return new class extends Migration {
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
 
             // Dados da transação template
-            $table->enum('type', ['receita', 'despesa']);
+            $table->enum('type', ['receita', 'despesa', 'transferencia']);
             $table->decimal('value', 15, 2);
             $table->string('description');
             $table->foreignId('category_id')->nullable()->constrained()->nullOnDelete();
@@ -42,9 +42,10 @@ return new class extends Migration {
             $table->date('last_generated_at')->nullable(); // Última geração (evita duplicações)
 
             // Status
-            $table->enum('status', ['ativa', 'pausada', 'encerrada'])->default('ativa');
+            $table->enum('status', ['ativa', 'pausada', 'encerrada', 'concluida'])->default('ativa');
 
             $table->timestamps();
+            $table->softDeletes();
 
             // Índices para performance
             $table->index(['user_id', 'status']);

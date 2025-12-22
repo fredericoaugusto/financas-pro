@@ -5,354 +5,256 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\RecurringTransaction;
 use App\Models\AuditLog;
-use App\Services\RecurringTransactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
+use App\Services\RecurringTransactionService;
 
 class RecurringTransactionController extends Controller
 {
-    protected RecurringTransactionService $service;
-
-    public function __construct(RecurringTransactionService $service)
-    {
-        $this->service = $service;
-    }
-
     /**
-     * Listar recorrências do usuário
+     * Lista recorrências do usuário
      */
     public function index(Request $request): JsonResponse
     {
         $query = RecurringTransaction::where('user_id', $request->user()->id)
-            ->with(['category', 'account', 'card'])
-            ->orderBy('next_occurrence');
+            ->with(['account', 'card', 'category'])
+            ->orderBy('next_occurrence', 'asc');
 
-        // Filtro por status
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
 
-        $recurrings = $query->get();
+        $recurrings = $query->paginate($request->per_page ?? 20);
 
-        return response()->json([
-            'data' => $recurrings,
-        ]);
+        return response()->json($recurrings);
     }
 
     /**
-     * Criar nova recorrência
+     * Cria nova regra de recorrência
      */
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'type' => ['required', 'in:receita,despesa'],
-            'value' => ['required', 'numeric', 'min:0.01'],
             'description' => ['required', 'string', 'max:255'],
+            'value' => ['required', 'numeric', 'min:0.01'],
+            'type' => ['required', 'in:receita,despesa'], // Transferência bloqueada no MVP
+            'frequency' => ['required', 'in:semanal,mensal,anual,personalizada'],
+            'frequency_value' => ['required', 'integer', 'min:1'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['nullable', 'date', 'after:start_date'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'account_id' => ['nullable', 'exists:accounts,id'],
             'card_id' => ['nullable', 'exists:cards,id'],
-            'payment_method' => ['nullable', 'in:dinheiro,debito,credito,pix,boleto,transferencia'],
+            'payment_method' => ['required', 'in:dinheiro,debito,credito,pix,boleto'],
             'notes' => ['nullable', 'string'],
-            'frequency' => ['required', 'in:semanal,mensal,anual,personalizada'],
-            'frequency_value' => ['required', 'integer', 'min:1', 'max:365'],
-            'start_date' => ['required', 'date'],
-            'end_date' => ['nullable', 'date', 'after:start_date'],
         ], [
-            'type.required' => 'O tipo é obrigatório.',
-            'value.required' => 'O valor é obrigatório.',
-            'value.min' => 'O valor deve ser maior que zero.',
-            'description.required' => 'A descrição é obrigatória.',
-            'frequency.required' => 'A frequência é obrigatória.',
-            'start_date.required' => 'A data de início é obrigatória.',
+            'type.in' => 'Transferências recorrentes indisponíveis no momento.',
         ]);
 
-        // Primeira ocorrência é a start_date (se <= hoje) ou a própria start_date
-        $startDate = Carbon::parse($validated['start_date']);
-        $nextOccurrence = $startDate->isFuture() ? $startDate : $startDate;
+        // Validação cruzada
+        if ($validated['payment_method'] === 'credito' && empty($validated['card_id'])) {
+            return response()->json(['message' => 'Cartão obrigatório para crédito.'], 422);
+        }
 
-        $recurring = RecurringTransaction::create([
-            'user_id' => $request->user()->id,
-            ...$validated,
-            'next_occurrence' => $nextOccurrence,
-            'status' => 'ativa',
-        ]);
+        // Setup inicial
+        $data = $validated;
+        $data['user_id'] = $request->user()->id;
+        $data['status'] = 'ativa';
 
-        AuditLog::log('create', 'RecurringTransaction', $recurring->id, [
-            'description' => $recurring->description,
-            'type' => $recurring->type,
-            'frequency' => $recurring->frequency,
-        ]);
+        // Next occurrence começa na start_date
+        // Se start_date já passou, o job vai pegar.
+        $data['next_occurrence'] = $data['start_date'];
+
+        $recurring = RecurringTransaction::create($data);
+
+        AuditLog::log('create', 'RecurringTransaction', $recurring->id);
 
         return response()->json([
-            'message' => 'Recorrência criada com sucesso!',
+            'message' => 'Assinatura criada com sucesso!',
             'data' => $recurring->load(['category', 'account', 'card']),
         ], 201);
     }
 
     /**
-     * Exibir uma recorrência
+     * Detalhes
      */
-    public function show(Request $request, RecurringTransaction $recurringTransaction): JsonResponse
+    public function show(Request $request, RecurringTransaction $recurring): JsonResponse
     {
-        if ($recurringTransaction->user_id !== $request->user()->id) {
+        if ($recurring->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Não autorizado.'], 403);
         }
 
         return response()->json([
-            'data' => $recurringTransaction->load(['category', 'account', 'card', 'transactions']),
+            'data' => $recurring->load([
+                'transactions' => function ($q) {
+                    $q->latest()->limit(5); // Mostrar últimas 5 gerações
+                },
+                'category',
+                'account',
+                'card'
+            ]),
         ]);
     }
 
     /**
-     * Atualizar recorrência
-     * 
-     * IMPORTANTE: Só afeta gerações FUTURAS
+     * Atualizar
      */
-    public function update(Request $request, RecurringTransaction $recurringTransaction): JsonResponse
+    public function update(Request $request, RecurringTransaction $recurring): JsonResponse
     {
-        if ($recurringTransaction->user_id !== $request->user()->id) {
+        if ($recurring->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Não autorizado.'], 403);
         }
 
         $validated = $request->validate([
-            'type' => ['sometimes', 'in:receita,despesa'],
-            'value' => ['sometimes', 'numeric', 'min:0.01'],
             'description' => ['sometimes', 'string', 'max:255'],
+            'value' => ['sometimes', 'numeric', 'min:0.01'],
+            'start_date' => ['sometimes', 'date'],
+            'end_date' => ['nullable', 'date', 'after:start_date'],
             'category_id' => ['nullable', 'exists:categories,id'],
-            'account_id' => ['nullable', 'exists:accounts,id'],
-            'card_id' => ['nullable', 'exists:cards,id'],
-            'payment_method' => ['nullable', 'in:dinheiro,debito,credito,pix,boleto,transferencia'],
+            'status' => ['sometimes', 'in:ativa,pausada,encerrada'],
+            // Não permitimos mudar frequency/type facilmente pois quebra a lógica de next_occurrence
+            // Se precisar mudar frequência, melhor recriar ou exigir re-cálculo de next_occurrence
             'notes' => ['nullable', 'string'],
-            'frequency' => ['sometimes', 'in:semanal,mensal,anual,personalizada'],
-            'frequency_value' => ['sometimes', 'integer', 'min:1', 'max:365'],
-            'end_date' => ['nullable', 'date'],
         ]);
 
-        $recurringTransaction->update($validated);
+        $recurring->update($validated);
 
-        AuditLog::log('update', 'RecurringTransaction', $recurringTransaction->id, [
-            'changes' => array_keys($validated),
+        // Se status mudou para ativa e next_occurrence estava no passado, talvez devêssemos ajustar?
+        // Deixar para o job ou manual.
+
+        AuditLog::log('update', 'RecurringTransaction', $recurring->id, [
+            'changes' => $recurring->getChanges()
         ]);
 
         return response()->json([
-            'message' => 'Recorrência atualizada!',
-            'data' => $recurringTransaction->fresh(['category', 'account', 'card']),
+            'message' => 'Assinatura atualizada!',
+            'data' => $recurring->fresh()->load(['category', 'account', 'card']),
         ]);
     }
 
-    /**
-     * Pausar recorrência
-     * 
-     * IMPORTANTE: Ao pausar, remove transações PENDENTES futuras no cartão
-     */
-    public function pause(Request $request, RecurringTransaction $recurringTransaction): JsonResponse
+    public function destroy(Request $request, RecurringTransaction $recurring): JsonResponse
     {
-        if ($recurringTransaction->user_id !== $request->user()->id) {
+        if ($recurring->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Não autorizado.'], 403);
         }
 
-        if ($recurringTransaction->status === 'encerrada') {
-            return response()->json([
-                'message' => 'Não é possível pausar uma recorrência encerrada.',
-            ], 422);
-        }
+        $recurring->delete(); // Soft delete per model
 
-        $recurringTransaction->update(['status' => 'pausada']);
-
-        // Se é recorrência no cartão, remover transações PENDENTES futuras
-        if ($recurringTransaction->card_id) {
-            $this->removePendingFutureTransactions($recurringTransaction);
-        }
-
-        AuditLog::log('pause', 'RecurringTransaction', $recurringTransaction->id);
+        AuditLog::log('delete', 'RecurringTransaction', $recurring->id);
 
         return response()->json([
-            'message' => 'Recorrência pausada!',
-            'data' => $recurringTransaction->fresh(['category', 'account', 'card']),
+            'message' => 'Assinatura removida (arquivada)!',
         ]);
     }
 
-    /**
-     * Remove transações pendentes de recorrência no cartão
-     * Usado quando pausa ou encerra recorrência
-     */
-    protected function removePendingFutureTransactions(RecurringTransaction $recurring): void
+    public function pause(Request $request, RecurringTransaction $recurring): JsonResponse
     {
-        // Buscar transações pendentes desta recorrência
-        $pendingTransactions = \App\Models\Transaction::where('recurring_transaction_id', $recurring->id)
-            ->where('status', 'pendente')
-            ->whereDate('date', '>=', Carbon::today())
-            ->get();
-
-        foreach ($pendingTransactions as $transaction) {
-            // Remover parcelas pendentes da fatura
-            \App\Models\CardInstallment::where('transaction_id', $transaction->id)
-                ->where('status', 'pendente')
-                ->delete();
-
-            // Remover a transação
-            $transaction->delete();
-
-            // Recalcular totais da fatura se existir
-            if ($transaction->card_invoice_id) {
-                $invoice = \App\Models\CardInvoice::find($transaction->card_invoice_id);
-                if ($invoice) {
-                    $invoice->recalculateTotal();
-                }
-            }
-        }
-    }
-
-    /**
-     * Retomar recorrência pausada
-     */
-    public function resume(Request $request, RecurringTransaction $recurringTransaction): JsonResponse
-    {
-        if ($recurringTransaction->user_id !== $request->user()->id) {
+        if ($recurring->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Não autorizado.'], 403);
         }
 
-        if ($recurringTransaction->status !== 'pausada') {
-            return response()->json([
-                'message' => 'Apenas recorrências pausadas podem ser retomadas.',
-            ], 422);
-        }
-
-        // Se next_occurrence está no passado, atualizar para hoje
-        $nextOccurrence = $recurringTransaction->next_occurrence;
-        if ($nextOccurrence->isPast()) {
-            $nextOccurrence = Carbon::today();
-        }
-
-        $recurringTransaction->update([
-            'status' => 'ativa',
-            'next_occurrence' => $nextOccurrence,
-        ]);
-
-        AuditLog::log('resume', 'RecurringTransaction', $recurringTransaction->id);
+        $recurring->update(['status' => 'pausada']);
+        AuditLog::log('pause', 'RecurringTransaction', $recurring->id);
 
         return response()->json([
-            'message' => 'Recorrência retomada!',
-            'data' => $recurringTransaction->fresh(),
+            'message' => 'Recorrência pausada.',
+            'data' => $recurring->load(['account', 'card', 'category'])
         ]);
     }
 
-    /**
-     * Encerrar recorrência (permanente)
-     * 
-     * IMPORTANTE: Remove transações PENDENTES futuras no cartão
-     */
-    public function end(Request $request, RecurringTransaction $recurringTransaction): JsonResponse
+    public function resume(Request $request, RecurringTransaction $recurring): JsonResponse
     {
-        if ($recurringTransaction->user_id !== $request->user()->id) {
+        if ($recurring->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Não autorizado.'], 403);
         }
 
-        if ($recurringTransaction->status === 'encerrada') {
-            return response()->json([
-                'message' => 'Recorrência já está encerrada.',
-            ], 422);
+        $recurring->update(['status' => 'ativa']);
+        AuditLog::log('resume', 'RecurringTransaction', $recurring->id);
+
+        return response()->json([
+            'message' => 'Recorrência retomada.',
+            'data' => $recurring->load(['account', 'card', 'category'])
+        ]);
+    }
+
+    public function end(Request $request, RecurringTransaction $recurring): JsonResponse
+    {
+        if ($recurring->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Não autorizado.'], 403);
         }
 
-        $recurringTransaction->update([
+        $recurring->update([
             'status' => 'encerrada',
-            'end_date' => Carbon::today(),
+            'end_date' => now()
         ]);
-
-        // Se é recorrência no cartão, remover transações PENDENTES futuras
-        if ($recurringTransaction->card_id) {
-            $this->removePendingFutureTransactions($recurringTransaction);
-        }
-
-        AuditLog::log('end', 'RecurringTransaction', $recurringTransaction->id);
+        AuditLog::log('end', 'RecurringTransaction', $recurring->id);
 
         return response()->json([
-            'message' => 'Recorrência encerrada permanentemente.',
-            'data' => $recurringTransaction->fresh(['category', 'account', 'card']),
+            'message' => 'Recorrência encerrada.',
+            'data' => $recurring->load(['account', 'card', 'category'])
         ]);
     }
 
-    /**
-     * Excluir recorrência (somente se nunca gerou transações)
-     */
-    public function destroy(Request $request, RecurringTransaction $recurringTransaction): JsonResponse
+    public function generate(Request $request, RecurringTransaction $recurring, RecurringTransactionService $service): JsonResponse
     {
-        if ($recurringTransaction->user_id !== $request->user()->id) {
+        if ($recurring->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Não autorizado.'], 403);
-        }
-
-        // Verificar se já gerou transações
-        if ($recurringTransaction->transactions()->count() > 0) {
-            return response()->json([
-                'message' => 'Esta recorrência já gerou transações. Use "Encerrar" ao invés de excluir.',
-            ], 422);
-        }
-
-        AuditLog::log('delete', 'RecurringTransaction', $recurringTransaction->id);
-
-        $recurringTransaction->delete();
-
-        return response()->json([
-            'message' => 'Recorrência excluída!',
-        ]);
-    }
-
-    /**
-     * Gerar transação manualmente (força geração imediata)
-     */
-    public function generate(Request $request, RecurringTransaction $recurringTransaction): JsonResponse
-    {
-        if ($recurringTransaction->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'Não autorizado.'], 403);
-        }
-
-        if ($recurringTransaction->status !== 'ativa') {
-            return response()->json([
-                'message' => 'Apenas recorrências ativas podem gerar transações.',
-            ], 422);
         }
 
         try {
-            $transaction = $this->service->generateTransaction($recurringTransaction);
+            $transaction = $service->generateTransaction($recurring);
 
             return response()->json([
                 'message' => 'Transação gerada com sucesso!',
                 'data' => [
-                    'transaction' => $transaction->load(['category', 'account']),
-                    'recurring' => $recurringTransaction->fresh(),
-                ],
+                    'recurring' => $recurring->fresh()->load(['category', 'account', 'card']),
+                    'transaction_id' => $transaction->id
+                ]
             ]);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Erro ao gerar transação: ' . $e->getMessage(),
-            ], 500);
+            return response()->json(['message' => 'Erro ao gerar: ' . $e->getMessage()], 400);
         }
     }
 
     /**
-     * Retorna projeção de recorrências para um período
-     * Usado para cálculo de saldo previsto no dashboard
+     * Retorna sugestões de assinaturas detectadas automaticamente
      */
-    public function projection(Request $request): JsonResponse
+    public function suggestions(Request $request, \App\Services\SubscriptionDetectionService $detector): JsonResponse
     {
-        $request->validate([
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-        ]);
-
-        $projection = $this->service->calculateProjection(
-            $request->user()->id,
-            $request->start_date,
-            $request->end_date
-        );
+        $suggestions = $detector->detectPotentialSubscriptions($request->user()->id);
 
         return response()->json([
-            'data' => [
-                'receitas' => $projection['receitas'],
-                'despesas' => $projection['despesas'],
-                'saldo_projetado' => $projection['receitas'] - $projection['despesas'],
-            ],
+            'data' => $suggestions,
+            'count' => $suggestions->count()
         ]);
     }
+
+    /**
+     * Cria recorrência a partir de uma sugestão
+     */
+    public function createFromSuggestion(Request $request, \App\Services\SubscriptionDetectionService $detector): JsonResponse
+    {
+        $validated = $request->validate([
+            'description' => ['required', 'string'],
+            'amount_avg' => ['required', 'numeric'],
+            'amount_last' => ['nullable', 'numeric'],
+            'frequency' => ['required', 'string'],
+            'frequency_value' => ['required', 'integer'],
+            'last_occurrence' => ['required', 'date'],
+            'category_id' => ['nullable', 'integer'],
+            'account_id' => ['nullable', 'integer'],
+            'card_id' => ['nullable', 'integer'],
+            'payment_method' => ['nullable', 'string'],
+        ]);
+
+        $recurring = $detector->createRecurringFromSuggestion($request->user()->id, $validated);
+
+        AuditLog::log('create_from_suggestion', 'RecurringTransaction', $recurring->id);
+
+        return response()->json([
+            'message' => 'Recorrência criada a partir da sugestão!',
+            'data' => $recurring->load(['category', 'account', 'card'])
+        ], 201);
+    }
 }
+

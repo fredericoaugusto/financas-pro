@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\RecurringTransactionController;
 use App\Http\Controllers\Api\BudgetController;
 use App\Http\Controllers\Api\GoalController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\ImportController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -58,16 +59,20 @@ Route::middleware('auth:sanctum')->group(function () {
     // Attachments
     Route::get('transactions/{transaction}/attachments', [TransactionAttachmentController::class, 'index']);
     Route::post('transactions/{transaction}/attachments', [TransactionAttachmentController::class, 'store']);
-    Route::get('attachments/{attachment}/download', [TransactionAttachmentController::class, 'download']);
     Route::delete('attachments/{attachment}', [TransactionAttachmentController::class, 'destroy']);
+    Route::get('attachments/{attachment}/download', [TransactionAttachmentController::class, 'download']);
 
-    // Recurring Transactions (Recorrências)
-    Route::apiResource('recurring-transactions', RecurringTransactionController::class);
-    Route::post('recurring-transactions/{recurring_transaction}/pause', [RecurringTransactionController::class, 'pause']);
-    Route::post('recurring-transactions/{recurring_transaction}/resume', [RecurringTransactionController::class, 'resume']);
-    Route::post('recurring-transactions/{recurring_transaction}/end', [RecurringTransactionController::class, 'end']);
-    Route::post('recurring-transactions/{recurring_transaction}/generate', [RecurringTransactionController::class, 'generate']);
-    Route::get('recurring-transactions-projection', [RecurringTransactionController::class, 'projection']);
+    // Recurring Transactions
+    Route::apiResource('recurring-transactions', App\Http\Controllers\Api\RecurringTransactionController::class);
+    Route::post('recurring-transactions/{recurring}/pause', [App\Http\Controllers\Api\RecurringTransactionController::class, 'pause']);
+    Route::post('recurring-transactions/{recurring}/resume', [App\Http\Controllers\Api\RecurringTransactionController::class, 'resume']);
+    Route::post('recurring-transactions/{recurring}/end', [App\Http\Controllers\Api\RecurringTransactionController::class, 'end']);
+    Route::post('recurring-transactions/{recurring}/generate', [App\Http\Controllers\Api\RecurringTransactionController::class, 'generate']);
+    Route::get('recurrences/suggestions', [App\Http\Controllers\Api\RecurringTransactionController::class, 'suggestions']);
+    Route::post('recurrences/suggestions/create', [App\Http\Controllers\Api\RecurringTransactionController::class, 'createFromSuggestion']);
+
+    // Calendar
+    Route::get('calendar', [App\Http\Controllers\Api\CalendarController::class, 'index']);
 
     // Categories
     Route::apiResource('categories', CategoryController::class)->except(['show']);
@@ -118,4 +123,8 @@ Route::middleware('auth:sanctum')->group(function () {
             'data' => $query->take(20)->get(),
         ]);
     });
+
+    // Import OFX
+    Route::post('import/parse', [ImportController::class, 'parse']);
+    Route::post('import/confirm', [ImportController::class, 'confirm']);
 });

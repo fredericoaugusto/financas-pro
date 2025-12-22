@@ -13,7 +13,7 @@ return new class extends Migration {
             $table->string('action'); // create, update, delete, login, logout, etc.
             $table->string('model')->nullable(); // Account, Card, Transaction, etc.
             $table->unsignedBigInteger('model_id')->nullable();
-            $table->json('changes')->nullable(); // {old: {...}, new: {...}}
+            $table->json('details')->nullable(); // {old: {...}, new: {...}}
             $table->string('ip_address', 45)->nullable();
             $table->string('user_agent')->nullable();
             $table->timestamp('created_at')->useCurrent();

@@ -27,7 +27,7 @@ class BusinessAuditService
             'action' => $event,
             'model' => class_basename($target),
             'model_id' => $target->id,
-            'changes' => $structuredChanges,
+            'details' => $structuredChanges,
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
             'created_at' => now(),

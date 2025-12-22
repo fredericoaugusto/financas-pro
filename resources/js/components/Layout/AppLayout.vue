@@ -215,14 +215,32 @@ const ChartsIcon = {
     }
 };
 
+const CalendarIcon = {
+    render() {
+        return h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+            h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' })
+        ]);
+    }
+};
+
+const ImportIcon = {
+    render() {
+        return h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+            h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12' })
+        ]);
+    }
+};
+
 const navigation = [
     { name: 'Dashboard', to: '/', icon: DashboardIcon },
     { name: 'Contas', to: '/accounts', icon: AccountsIcon },
     { name: 'Cartões', to: '/cards', icon: CardsIcon },
     { name: 'Lançamentos', to: '/transactions', icon: TransactionsIcon },
+    { name: 'Importar', to: '/import', icon: ImportIcon },
     { name: 'Recorrências', to: '/recurrences', icon: RecurrencesIcon },
     { name: 'Orçamentos', to: '/budgets', icon: BudgetsIcon },
     { name: 'Objetivos', to: '/goals', icon: GoalsIcon },
+    { name: 'Calendário', to: '/calendar', icon: CalendarIcon },
     { name: 'Gráficos', to: '/charts', icon: ChartsIcon },
     { name: 'Categorias', to: '/categories', icon: CategoriesIcon },
     { name: 'Configurações', to: '/settings', icon: SettingsIcon },

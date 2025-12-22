@@ -19,6 +19,8 @@ import Recurrences from '@/pages/Recurrences/Index.vue';
 import Budgets from '@/pages/Budgets/Index.vue';
 import Goals from '@/pages/Goals/Index.vue';
 import Charts from '@/pages/Charts/Index.vue';
+import Calendar from '@/pages/Calendar/Index.vue';
+import Import from '@/pages/Import/Index.vue';
 import Settings from '@/pages/Settings.vue';
 
 const routes = [
@@ -125,6 +127,12 @@ const routes = [
         component: Recurrences,
         meta: { auth: true },
     },
+    {
+        path: '/recurrences/suggestions',
+        name: 'recurrences.suggestions',
+        component: () => import('@/pages/Recurrences/Suggestions.vue'),
+        meta: { auth: true },
+    },
 
     // Budgets (Orçamentos)
     {
@@ -147,6 +155,22 @@ const routes = [
         path: '/charts',
         name: 'charts',
         component: Charts,
+        meta: { auth: true },
+    },
+
+    // Calendar
+    {
+        path: '/calendar',
+        name: 'calendar',
+        component: Calendar,
+        meta: { auth: true },
+    },
+
+    // Import
+    {
+        path: '/import',
+        name: 'import',
+        component: Import,
         meta: { auth: true },
     },
 

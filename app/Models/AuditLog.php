@@ -17,14 +17,14 @@ class AuditLog extends Model
         'action',
         'model',
         'model_id',
-        'changes',
+        'details',
         'ip_address',
         'user_agent',
         'created_at',
     ];
 
     protected $casts = [
-        'changes' => 'array',
+        'details' => 'array',
         'created_at' => 'datetime',
     ];
 
@@ -48,7 +48,7 @@ class AuditLog extends Model
             'action' => $action,
             'model' => $model,
             'model_id' => $modelId,
-            'changes' => $changes,
+            'details' => $changes,
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
             'created_at' => now(),

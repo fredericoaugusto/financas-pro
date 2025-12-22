@@ -32,6 +32,8 @@ class Transaction extends Model
         'affects_balance',
         'status', // confirmada, pendente, estornada, cancelada
         'notes',
+        'import_hash',
+        'import_hash_version',
     ];
 
     protected $casts = [
