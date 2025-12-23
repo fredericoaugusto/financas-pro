@@ -4,107 +4,120 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GeneralBudget extends Model
 {
     protected $fillable = [
         'user_id',
         'name',
-        'amount',
-        'type',
+        'limit_value',
+        'period_type',
+        'start_date',
+        'status',
         'category_ids',
         'include_future_categories',
-        'month',
-        'year',
-        'is_active',
-        'alert_80_sent',
-        'alert_100_sent',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
+        'limit_value' => 'decimal:2',
+        'start_date' => 'date',
         'category_ids' => 'array',
         'include_future_categories' => 'boolean',
-        'is_active' => 'boolean',
-        'alert_80_sent' => 'boolean',
-        'alert_100_sent' => 'boolean',
     ];
 
-    protected $appends = ['spent', 'percentage', 'status'];
+    protected $appends = ['current_period'];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the amount spent against this budget.
-     */
-    public function getSpentAttribute(): float
+    public function periods(): HasMany
     {
-        $query = Transaction::where('user_id', $this->user_id)
-            ->where('type', 'despesa');
-
-        // Date filter based on type
-        if ($this->type === 'mensal' && $this->month) {
-            $startDate = sprintf('%04d-%02d-01', $this->year, $this->month);
-            $lastDay = date('t', strtotime($startDate));
-            $endDate = sprintf('%04d-%02d-%02d', $this->year, $this->month, $lastDay);
-            $query->whereBetween('date', [$startDate, $endDate]);
-        } else {
-            // Annual
-            $query->whereYear('date', $this->year);
-        }
-
-        // Category filter
-        if (!$this->include_future_categories && !empty($this->category_ids)) {
-            $query->whereIn('category_id', $this->category_ids);
-        }
-        // If include_future_categories = true or category_ids is empty, include all categories
-
-        return (float) $query->sum('value');
+        return $this->hasMany(GeneralBudgetPeriod::class);
     }
 
     /**
-     * Get spending percentage.
+     * Get the current period (or create if not exists).
      */
-    public function getPercentageAttribute(): float
-    {
-        if ($this->amount <= 0)
-            return 0;
-        return min(($this->spent / $this->amount) * 100, 150); // Cap at 150%
-    }
-
-    /**
-     * Get budget status (within, warning, exceeded).
-     */
-    public function getStatusAttribute(): string
-    {
-        $percentage = $this->percentage;
-        if ($percentage >= 100)
-            return 'exceeded';
-        if ($percentage >= 80)
-            return 'warning';
-        return 'within';
-    }
-
-    /**
-     * Scope for current month.
-     */
-    public function scopeCurrentMonth($query)
+    public function getCurrentPeriodAttribute(): ?GeneralBudgetPeriod
     {
         $now = now();
-        return $query->where('type', 'mensal')
-            ->where('month', $now->month)
-            ->where('year', $now->year);
+        $year = $now->year;
+        $month = $this->period_type === 'monthly' ? $now->month : null;
+
+        return $this->periods()
+            ->where('reference_year', $year)
+            ->where('reference_month', $month)
+            ->first();
     }
 
     /**
-     * Scope for current year.
+     * Ensure the current period exists.
      */
-    public function scopeCurrentYear($query)
+    public function ensureCurrentPeriod(): GeneralBudgetPeriod
     {
-        return $query->where('type', 'anual')
-            ->where('year', now()->year);
+        if ($this->status !== 'active') {
+            return $this->currentPeriod ?? new GeneralBudgetPeriod();
+        }
+
+        $now = now();
+        $year = $now->year;
+        $month = $this->period_type === 'monthly' ? $now->month : null;
+
+        $period = $this->periods()
+            ->where('reference_year', $year)
+            ->where('reference_month', $month)
+            ->first();
+
+        if (!$period) {
+            $period = $this->periods()->create([
+                'reference_year' => $year,
+                'reference_month' => $month,
+                'limit_value_snapshot' => $this->limit_value,
+                'spent' => 0,
+                'status' => 'ok',
+            ]);
+            $period->recalculateSpent();
+        }
+
+        return $period;
+    }
+
+    /**
+     * Check if budget is active.
+     */
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    /**
+     * Pause the budget.
+     */
+    public function pause(): void
+    {
+        $this->status = 'paused';
+        $this->save();
+    }
+
+    /**
+     * Resume the budget.
+     */
+    public function resume(): void
+    {
+        $this->status = 'active';
+        $this->save();
+        $this->ensureCurrentPeriod();
+    }
+
+    /**
+     * End the budget permanently.
+     */
+    public function end(): void
+    {
+        $this->status = 'ended';
+        $this->save();
     }
 }

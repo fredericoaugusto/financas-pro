@@ -35,3 +35,14 @@ Schedule::job(new \App\Jobs\CheckInvoicesDueSoon())
     ->at('08:00')
     ->withoutOverlapping()
     ->description('Notifica sobre faturas próximas do vencimento');
+
+/**
+ * Job para gerar períodos de orçamentos gerais
+ * 
+ * Executa todo dia 01 às 00:10
+ * Cria períodos do mês atual para orçamentos ativos
+ */
+Schedule::job(new \App\Jobs\GenerateGeneralBudgetPeriods())
+    ->monthlyOn(1, '00:10')
+    ->withoutOverlapping()
+    ->description('Gera períodos do orçamento geral para o mês atual');

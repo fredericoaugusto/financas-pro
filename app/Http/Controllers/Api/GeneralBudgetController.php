@@ -4,47 +4,39 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\GeneralBudget;
+use App\Services\GeneralBudgetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class GeneralBudgetController extends Controller
 {
+    public function __construct(
+        private GeneralBudgetService $service
+    ) {
+    }
+
     /**
      * List general budgets for user.
      */
     public function index(Request $request): JsonResponse
     {
-        $query = GeneralBudget::where('user_id', Auth::id());
+        $query = GeneralBudget::where('user_id', Auth::id())
+            ->with('periods');
 
-        // Filter by type
-        if ($request->filled('type')) {
-            $query->where('type', $request->type);
+        // Filter by status
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
         }
 
-        // Filter by year
-        if ($request->filled('year')) {
-            $query->where('year', $request->year);
-        }
+        $budgets = $query->orderBy('created_at', 'desc')->get();
 
-        // Filter current only
-        if ($request->boolean('current')) {
-            $now = now();
-            $query->where(function ($q) use ($now) {
-                $q->where(function ($subQ) use ($now) {
-                    $subQ->where('type', 'mensal')
-                        ->where('month', $now->month)
-                        ->where('year', $now->year);
-                })->orWhere(function ($subQ) use ($now) {
-                    $subQ->where('type', 'anual')
-                        ->where('year', $now->year);
-                });
-            });
-        }
-
-        $budgets = $query->orderBy('year', 'desc')
-            ->orderBy('month', 'desc')
-            ->get();
+        // Add current period info
+        $budgets->each(function ($budget) {
+            if ($budget->status === 'active') {
+                $budget->ensureCurrentPeriod();
+            }
+        });
 
         return response()->json([
             'data' => $budgets,
@@ -58,38 +50,42 @@ class GeneralBudgetController extends Controller
     {
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'amount' => ['required', 'numeric', 'min:0.01'],
-            'type' => ['required', 'in:mensal,anual'],
+            'limit_value' => ['required', 'numeric', 'min:0.01'],
+            'period_type' => ['required', 'in:monthly,yearly'],
+            'include_future_categories' => ['sometimes', 'boolean'],
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['exists:categories,id'],
-            'include_future_categories' => ['sometimes', 'boolean'],
-            'month' => ['required_if:type,mensal', 'integer', 'min:1', 'max:12'],
-            'year' => ['required', 'integer', 'min:2020', 'max:2099'],
         ]);
 
-        // Check for existing budget
+        // Check for existing active budget of same type
         $existing = GeneralBudget::where('user_id', Auth::id())
-            ->where('type', $validated['type'])
-            ->where('month', $validated['month'] ?? null)
-            ->where('year', $validated['year'])
+            ->where('period_type', $validated['period_type'])
+            ->where('status', 'active')
             ->first();
 
         if ($existing) {
             return response()->json([
-                'message' => 'Já existe um orçamento geral para este período.',
+                'message' => 'Já existe um orçamento geral ativo desse tipo. Pause ou encerre o anterior primeiro.',
             ], 422);
         }
 
         $budget = GeneralBudget::create([
-            ...$validated,
             'user_id' => Auth::id(),
             'name' => $validated['name'] ?? 'Orçamento Geral',
-            'include_future_categories' => $validated['include_future_categories'] ?? false,
+            'limit_value' => $validated['limit_value'],
+            'period_type' => $validated['period_type'],
+            'start_date' => now()->startOfMonth(),
+            'status' => 'active',
+            'include_future_categories' => $validated['include_future_categories'] ?? true,
+            'category_ids' => $validated['category_ids'] ?? null,
         ]);
+
+        // Create the first period immediately
+        $budget->ensureCurrentPeriod();
 
         return response()->json([
             'message' => 'Orçamento geral criado com sucesso!',
-            'data' => $budget,
+            'data' => $budget->load('periods'),
         ], 201);
     }
 
@@ -100,6 +96,11 @@ class GeneralBudgetController extends Controller
     {
         if ($generalBudget->user_id !== Auth::id()) {
             return response()->json(['message' => 'Não autorizado.'], 403);
+        }
+
+        $generalBudget->load('periods');
+        if ($generalBudget->status === 'active') {
+            $generalBudget->ensureCurrentPeriod();
         }
 
         return response()->json([
@@ -118,24 +119,27 @@ class GeneralBudgetController extends Controller
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'amount' => ['sometimes', 'numeric', 'min:0.01'],
+            'limit_value' => ['sometimes', 'numeric', 'min:0.01'],
+            'include_future_categories' => ['sometimes', 'boolean'],
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['exists:categories,id'],
-            'include_future_categories' => ['sometimes', 'boolean'],
-            'is_active' => ['sometimes', 'boolean'],
         ]);
-
-        // Reset alert flags if amount changed
-        if (isset($validated['amount']) && $validated['amount'] != $generalBudget->amount) {
-            $validated['alert_80_sent'] = false;
-            $validated['alert_100_sent'] = false;
-        }
 
         $generalBudget->update($validated);
 
+        // If limit changed, update current period snapshot
+        if (isset($validated['limit_value'])) {
+            $currentPeriod = $generalBudget->currentPeriod;
+            if ($currentPeriod) {
+                $currentPeriod->limit_value_snapshot = $validated['limit_value'];
+                $currentPeriod->recalculateSpent();
+                $this->service->checkThresholds($currentPeriod);
+            }
+        }
+
         return response()->json([
             'message' => 'Orçamento geral atualizado!',
-            'data' => $generalBudget->fresh(),
+            'data' => $generalBudget->fresh()->load('periods'),
         ]);
     }
 
@@ -156,31 +160,98 @@ class GeneralBudgetController extends Controller
     }
 
     /**
-     * Get current period summary (for Dashboard widget).
+     * Get current active budget with period.
      */
     public function current(): JsonResponse
     {
-        $now = now();
-
-        // Get current month budget + annual budget
         $monthlyBudget = GeneralBudget::where('user_id', Auth::id())
-            ->where('type', 'mensal')
-            ->where('month', $now->month)
-            ->where('year', $now->year)
-            ->where('is_active', true)
+            ->where('period_type', 'monthly')
+            ->where('status', 'active')
             ->first();
 
-        $annualBudget = GeneralBudget::where('user_id', Auth::id())
-            ->where('type', 'anual')
-            ->where('year', $now->year)
-            ->where('is_active', true)
+        $yearlyBudget = GeneralBudget::where('user_id', Auth::id())
+            ->where('period_type', 'yearly')
+            ->where('status', 'active')
             ->first();
+
+        // Ensure current periods exist
+        if ($monthlyBudget) {
+            $monthlyBudget->ensureCurrentPeriod();
+            $monthlyBudget->load('periods');
+        }
+        if ($yearlyBudget) {
+            $yearlyBudget->ensureCurrentPeriod();
+            $yearlyBudget->load('periods');
+        }
 
         return response()->json([
             'data' => [
                 'monthly' => $monthlyBudget,
-                'annual' => $annualBudget,
+                'yearly' => $yearlyBudget,
             ],
+        ]);
+    }
+
+    /**
+     * Pause a budget.
+     */
+    public function pause(GeneralBudget $generalBudget): JsonResponse
+    {
+        if ($generalBudget->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Não autorizado.'], 403);
+        }
+
+        if ($generalBudget->status !== 'active') {
+            return response()->json(['message' => 'Apenas orçamentos ativos podem ser pausados.'], 422);
+        }
+
+        $generalBudget->pause();
+
+        return response()->json([
+            'message' => 'Orçamento pausado.',
+            'data' => $generalBudget->fresh(),
+        ]);
+    }
+
+    /**
+     * Resume a paused budget.
+     */
+    public function resume(GeneralBudget $generalBudget): JsonResponse
+    {
+        if ($generalBudget->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Não autorizado.'], 403);
+        }
+
+        if ($generalBudget->status !== 'paused') {
+            return response()->json(['message' => 'Apenas orçamentos pausados podem ser retomados.'], 422);
+        }
+
+        $generalBudget->resume();
+
+        return response()->json([
+            'message' => 'Orçamento retomado.',
+            'data' => $generalBudget->fresh()->load('periods'),
+        ]);
+    }
+
+    /**
+     * End a budget permanently.
+     */
+    public function end(GeneralBudget $generalBudget): JsonResponse
+    {
+        if ($generalBudget->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Não autorizado.'], 403);
+        }
+
+        if ($generalBudget->status === 'ended') {
+            return response()->json(['message' => 'Orçamento já encerrado.'], 422);
+        }
+
+        $generalBudget->end();
+
+        return response()->json([
+            'message' => 'Orçamento encerrado.',
+            'data' => $generalBudget->fresh(),
         ]);
     }
 }

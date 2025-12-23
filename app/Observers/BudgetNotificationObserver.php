@@ -126,56 +126,26 @@ class BudgetNotificationObserver
 
         // Check monthly general budget
         $monthlyBudget = GeneralBudget::where('user_id', $userId)
-            ->where('type', 'mensal')
-            ->where('month', $month)
-            ->where('year', $year)
-            ->where('is_active', true)
+            ->where('period_type', 'monthly')
+            ->where('status', 'active')
             ->first();
 
         if ($monthlyBudget) {
-            $this->checkGeneralThreshold($monthlyBudget, $date);
+            $period = $monthlyBudget->ensureCurrentPeriod();
+            $period->recalculateSpent();
+            app(\App\Services\GeneralBudgetService::class)->checkThresholds($period);
         }
 
         // Check annual general budget
         $annualBudget = GeneralBudget::where('user_id', $userId)
-            ->where('type', 'anual')
-            ->where('year', $year)
-            ->where('is_active', true)
+            ->where('period_type', 'yearly')
+            ->where('status', 'active')
             ->first();
 
         if ($annualBudget) {
-            $this->checkGeneralThreshold($annualBudget, $date);
-        }
-    }
-
-    private function checkGeneralThreshold(GeneralBudget $budget, Carbon $date): void
-    {
-        $percentage = $budget->percentage;
-        $periodName = $budget->type === 'mensal'
-            ? $date->translatedFormat('F')
-            : $budget->year;
-
-        // 100% threshold
-        if ($percentage >= 100 && !$budget->alert_100_sent) {
-            $this->notificationService->create(
-                $budget->user_id,
-                Notification::TYPE_BUDGET_EXCEEDED,
-                'Orçamento Geral estourado',
-                "Seu orçamento geral de {$periodName} foi excedido.",
-                ['general_budget_id' => $budget->id, 'percentage' => round($percentage), 'spent' => $budget->spent, 'limit' => $budget->amount]
-            );
-            $budget->update(['alert_100_sent' => true]);
-        }
-        // 80% threshold
-        elseif ($percentage >= 80 && !$budget->alert_80_sent) {
-            $this->notificationService->create(
-                $budget->user_id,
-                Notification::TYPE_BUDGET_WARNING,
-                'Orçamento Geral em risco',
-                "Atenção: você já utilizou " . round($percentage) . "% do orçamento geral de {$periodName}.",
-                ['general_budget_id' => $budget->id, 'percentage' => round($percentage), 'spent' => $budget->spent, 'limit' => $budget->amount]
-            );
-            $budget->update(['alert_80_sent' => true]);
+            $period = $annualBudget->ensureCurrentPeriod();
+            $period->recalculateSpent();
+            app(\App\Services\GeneralBudgetService::class)->checkThresholds($period);
         }
     }
 

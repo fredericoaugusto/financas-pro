@@ -69,18 +69,45 @@
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ generalBudget.name }}</h3>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                            {{ generalBudget.name }}
+                            <span v-if="generalBudget.status === 'paused'" class="ml-2 text-sm text-yellow-600">(Pausado)</span>
+                        </h3>
                         <p class="text-sm text-gray-500">
-                            {{ formatCurrency(generalBudget.spent) }} de {{ formatCurrency(generalBudget.amount) }}
-                            <span class="ml-2">• {{ generalBudget.type === 'mensal' ? 'Mensal' : 'Anual' }}</span>
+                            {{ formatCurrency(currentPeriodSpent) }} de {{ formatCurrency(generalBudget.limit_value) }}
+                            <span class="ml-2">• {{ generalBudget.period_type === 'monthly' ? 'Mensal' : 'Anual' }}</span>
+                            <span v-if="currentPeriod" class="ml-2 text-gray-400">• {{ currentPeriodLabel }}</span>
                         </p>
                     </div>
                 </div>
-                <div class="flex items-center gap-4">
-                    <span :class="getGeneralBudgetStatusClass(generalBudget.status)">
-                        {{ getGeneralBudgetStatusLabel(generalBudget.status) }}
+                <div class="flex items-center gap-2">
+                    <span v-if="currentPeriod" :class="getGeneralBudgetStatusClass(currentPeriod.status)">
+                        {{ getGeneralBudgetStatusLabel(currentPeriod.status) }}
                     </span>
-                    <button @click="openGeneralBudgetModal" class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <!-- Pause/Resume button -->
+                    <button 
+                        v-if="generalBudget.status === 'active'" 
+                        @click="pauseGeneralBudget" 
+                        class="p-2 text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 rounded-lg"
+                        title="Pausar"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                    <button 
+                        v-else-if="generalBudget.status === 'paused'" 
+                        @click="resumeGeneralBudget" 
+                        class="p-2 text-green-500 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg"
+                        title="Retomar"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                    <!-- Edit button -->
+                    <button @click="openGeneralBudgetModal" class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" title="Editar">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
@@ -91,11 +118,11 @@
             <div class="relative h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div 
                     class="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
-                    :class="getGeneralProgressBarClass(generalBudget.status)"
-                    :style="{ width: Math.min(generalBudget.percentage, 100) + '%' }"
+                    :class="getGeneralProgressBarClass(currentPeriod?.status || 'ok')"
+                    :style="{ width: Math.min(currentPeriodPercentage, 100) + '%' }"
                 ></div>
             </div>
-            <p class="text-sm text-gray-500 mt-2 text-right">{{ Math.round(generalBudget.percentage) }}% utilizado</p>
+            <p class="text-sm text-gray-500 mt-2 text-right">{{ Math.round(currentPeriodPercentage) }}% utilizado</p>
         </div>
 
         <!-- No General Budget - Option to create -->
@@ -376,52 +403,30 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Valor Limite *
                         </label>
-                        <MoneyInput v-model="generalBudgetForm.amount" />
+                        <MoneyInput v-model="generalBudgetForm.limit_value" />
                     </div>
 
                     <!-- Type -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Tipo *
+                            Periodicidade *
                         </label>
                         <div class="flex gap-3">
                             <label class="flex-1">
-                                <input type="radio" v-model="generalBudgetForm.type" value="mensal" class="sr-only peer" />
+                                <input type="radio" v-model="generalBudgetForm.period_type" value="monthly" class="sr-only peer" />
                                 <div class="p-3 border rounded-lg text-center cursor-pointer peer-checked:border-primary-500 peer-checked:bg-primary-50 dark:peer-checked:bg-primary-900/30 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                     <span class="font-medium">Mensal</span>
+                                    <p class="text-xs text-gray-500 mt-1">Limite reinicia todo mês</p>
                                 </div>
                             </label>
                             <label class="flex-1">
-                                <input type="radio" v-model="generalBudgetForm.type" value="anual" class="sr-only peer" />
+                                <input type="radio" v-model="generalBudgetForm.period_type" value="yearly" class="sr-only peer" />
                                 <div class="p-3 border rounded-lg text-center cursor-pointer peer-checked:border-primary-500 peer-checked:bg-primary-50 dark:peer-checked:bg-primary-900/30 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                     <span class="font-medium">Anual</span>
+                                    <p class="text-xs text-gray-500 mt-1">Limite para o ano todo</p>
                                 </div>
                             </label>
                         </div>
-                    </div>
-
-                    <!-- Month (only for mensal) -->
-                    <div v-if="generalBudgetForm.type === 'mensal'" class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mês</label>
-                            <select v-model="generalBudgetForm.month" class="input">
-                                <option v-for="m in 12" :key="m" :value="m">{{ getMonthName(m) }}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ano</label>
-                            <select v-model="generalBudgetForm.year" class="input">
-                                <option v-for="y in [2024, 2025, 2026]" :key="y" :value="y">{{ y }}</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Year only (for anual) -->
-                    <div v-else>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ano</label>
-                        <select v-model="generalBudgetForm.year" class="input">
-                            <option v-for="y in [2024, 2025, 2026]" :key="y" :value="y">{{ y }}</option>
-                        </select>
                     </div>
 
                     <!-- Include all categories -->
@@ -524,15 +529,72 @@ async function loadGeneralBudget() {
     }
 }
 
+// Computed properties for current period
+const currentPeriod = computed(() => {
+    if (!generalBudget.value) return null;
+    // Find current period from periods array
+    const periods = generalBudget.value.periods || [];
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = generalBudget.value.period_type === 'monthly' ? now.getMonth() + 1 : null;
+    return periods.find(p => p.reference_year === year && p.reference_month === month) || null;
+});
+
+const currentPeriodSpent = computed(() => {
+    return parseFloat(currentPeriod.value?.spent || 0);
+});
+
+const currentPeriodPercentage = computed(() => {
+    return parseFloat(currentPeriod.value?.percentage || 0);
+});
+
+const currentPeriodLabel = computed(() => {
+    if (!currentPeriod.value) return '';
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    if (currentPeriod.value.reference_month) {
+        return months[currentPeriod.value.reference_month - 1] + '/' + currentPeriod.value.reference_year;
+    }
+    return String(currentPeriod.value.reference_year);
+});
+
+// Pause/Resume functions
+async function pauseGeneralBudget() {
+    if (!generalBudget.value) return;
+    try {
+        const response = await fetch(`/api/general-budgets/${generalBudget.value.id}/pause`, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+        });
+        if (response.ok) {
+            await loadGeneralBudget();
+        }
+    } catch (e) {
+        console.error('Error pausing budget:', e);
+    }
+}
+
+async function resumeGeneralBudget() {
+    if (!generalBudget.value) return;
+    try {
+        const response = await fetch(`/api/general-budgets/${generalBudget.value.id}/resume`, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+        });
+        if (response.ok) {
+            await loadGeneralBudget();
+        }
+    } catch (e) {
+        console.error('Error resuming budget:', e);
+    }
+}
+
 // General Budget Modal state
 const showGeneralBudgetModal = ref(false);
 const savingGeneralBudget = ref(false);
 const generalBudgetForm = ref({
     name: '',
-    amount: 0,
-    type: 'mensal',
-    month: new Date().getMonth() + 1,
-    year: new Date().getFullYear(),
+    limit_value: 0,
+    period_type: 'monthly',
     include_future_categories: true,
 });
 
@@ -541,10 +603,8 @@ function openGeneralBudgetModal() {
     if (generalBudget.value) {
         generalBudgetForm.value = {
             name: generalBudget.value.name || '',
-            amount: parseFloat(generalBudget.value.amount) || 0,
-            type: generalBudget.value.type || 'mensal',
-            month: generalBudget.value.month || new Date().getMonth() + 1,
-            year: generalBudget.value.year || new Date().getFullYear(),
+            limit_value: parseFloat(generalBudget.value.limit_value) || 0,
+            period_type: generalBudget.value.period_type || 'monthly',
             include_future_categories: generalBudget.value.include_future_categories ?? true,
         };
     } else {
@@ -566,15 +626,10 @@ async function saveGeneralBudget() {
     try {
         const payload = {
             name: generalBudgetForm.value.name || 'Orçamento Geral',
-            amount: generalBudgetForm.value.amount,
-            type: generalBudgetForm.value.type,
-            year: generalBudgetForm.value.year,
+            limit_value: generalBudgetForm.value.limit_value,
+            period_type: generalBudgetForm.value.period_type,
             include_future_categories: generalBudgetForm.value.include_future_categories,
         };
-        
-        if (generalBudgetForm.value.type === 'mensal') {
-            payload.month = generalBudgetForm.value.month;
-        }
 
         let response;
         if (generalBudget.value) {
@@ -614,8 +669,8 @@ function getMonthName(month) {
     return months[month - 1];
 }
 
-// Current period string
-const currentPeriod = computed(() => {
+// Current period string (for category budgets)
+const currentBudgetPeriodString = computed(() => {
     if (periodType.value === 'anual') {
         return String(selectedYear.value);
     }

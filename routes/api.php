@@ -87,7 +87,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // General Budgets (Orçamento Geral)
     Route::apiResource('general-budgets', GeneralBudgetController::class);
     Route::get('general-budgets-current', [GeneralBudgetController::class, 'current']);
-
+    Route::post('general-budgets/{generalBudget}/pause', [GeneralBudgetController::class, 'pause']);
+    Route::post('general-budgets/{generalBudget}/resume', [GeneralBudgetController::class, 'resume']);
+    Route::post('general-budgets/{generalBudget}/end', [GeneralBudgetController::class, 'end']);
 
     // Goals (Objetivos)
     Route::apiResource('goals', GoalController::class);
