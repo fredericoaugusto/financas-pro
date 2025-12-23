@@ -24,7 +24,7 @@
 
         <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            <!-- Left Column: Score & Stability -->
+            <!-- Left Column: Score -->
             <div class="lg:col-span-1 space-y-6">
                 <!-- Score Card -->
                 <div class="card relative overflow-visible">
@@ -85,44 +85,40 @@
                             <div class="bg-green-500 h-1.5 rounded-full" :style="{ width: (insights.score.breakdown.surplus / 25 * 100) + '%' }"></div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Recurring Patterns -->
-                <div v-if="insights.patterns.length" class="card">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                        <span>🔁</span> Padrões de Comportamento
-                    </h3>
-                    <div class="space-y-4">
-                        <div v-for="(pattern, idx) in insights.patterns" :key="idx" 
-                             class="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800">
-                            <div class="flex items-start gap-3">
-                                <div class="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0"
-                                     :style="{ backgroundColor: pattern.color || '#6366f1' }">
-                                    {{ pattern.icon || '📅' }}
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-700 dark:text-gray-200">
-                                        {{ pattern.message }}
-                                    </p>
-                                    <p class="text-xs text-indigo-600 dark:text-indigo-400 mt-1 font-medium">
-                                        {{ pattern.count }} vezes nos últimos 2 meses
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Score Improvement Guidance -->
+                    <div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Para melhorar seu score:</p>
+                        <ul class="text-sm text-gray-600 dark:text-gray-400 space-y-2">
+                            <li class="flex items-start gap-2">
+                                <span class="text-green-500">•</span>
+                                Reduzir variação mensal de gastos
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-green-500">•</span>
+                                Manter saldo positivo consistentemente
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-green-500">•</span>
+                                Respeitar os limites de orçamento
+                            </li>
+                        </ul>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Column: Trends & Anomalies -->
+            <!-- Right Column: Trends, Anomalies, Patterns, Stability -->
             <div class="lg:col-span-2 space-y-6">
                 
                 <!-- Anomalies (Alerts) -->
                 <div v-if="insights.anomalies.length" class="card border-l-4 border-orange-500">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                            <span>⚠️</span> Atenção: Gastos Atípicos
-                        </h3>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <span>⚠️</span> Atenção: Gastos Atípicos
+                            </h3>
+                            <p class="text-xs text-gray-400 mt-1 font-normal">Comparação com a média dos últimos 6 meses</p>
+                        </div>
                     </div>
                     <div class="space-y-3">
                         <RouterLink v-for="(anomaly, idx) in insights.anomalies" :key="idx" 
@@ -149,9 +145,12 @@
 
                 <!-- Trends Analysis -->
                 <div class="card">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                        <span>📈</span> Tendências por Categoria (3 meses)
-                    </h3>
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            <span>📈</span> Tendências por Categoria
+                        </h3>
+                        <p class="text-xs text-gray-400 mt-1 font-normal">Comparado aos 3 meses anteriores</p>
+                    </div>
                     
                     <div v-if="insights.trends.length" class="space-y-4">
                         <div v-for="trend in insights.trends" :key="trend.category.id" 
@@ -189,6 +188,35 @@
                     </div>
                     <div v-else class="text-center py-8 text-gray-500">
                         Nenhuma tendência significativa detectada recentemente.
+                    </div>
+                </div>
+
+                <!-- Recurring Patterns -->
+                <div v-if="insights.patterns.length" class="card">
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            <span>🔁</span> Padrões de Comportamento
+                        </h3>
+                        <p class="text-xs text-gray-400 mt-1 font-normal">Baseado nos últimos 2 meses</p>
+                    </div>
+                    <div class="space-y-4">
+                        <div v-for="(pattern, idx) in insights.patterns" :key="idx" 
+                             class="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0"
+                                     :style="{ backgroundColor: pattern.color || '#6366f1' }">
+                                    {{ pattern.icon || '📅' }}
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-700 dark:text-gray-200">
+                                        {{ pattern.message }}
+                                    </p>
+                                    <p class="text-xs text-indigo-600 dark:text-indigo-400 mt-1 font-medium">
+                                        {{ pattern.count }} vezes nos últimos 2 meses
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -265,19 +293,19 @@ function getScoreTextClass(score) {
 function getTrendColor(status) {
     if (status === 'increased') return 'text-orange-500'; // Despesa aumentou = atenção
     if (status === 'decreased') return 'text-green-500'; // Despesa caiu = bom
-    return 'text-gray-500';
+    return 'text-emerald-600'; // Estável = positivo
 }
 
 function getTrendLabel(status) {
     if (status === 'increased') return 'Aumento';
     if (status === 'decreased') return 'Queda';
-    return 'Estável';
+    return 'Dentro do padrão';
 }
 
 function getTrendIcon(status) {
     if (status === 'increased') return '📈';
     if (status === 'decreased') return '📉';
-    return '➡️';
+    return '✅';
 }
 
 onMounted(async () => {
