@@ -181,4 +181,83 @@ class BudgetController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Get historical budgets for same category (all months)
+     */
+    public function history(Request $request, Budget $budget): JsonResponse
+    {
+        if ($budget->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Não autorizado.'], 403);
+        }
+
+        // Get all budgets for the same category, sorted by most recent first
+        $history = Budget::where('user_id', $request->user()->id)
+            ->where('category_id', $budget->category_id)
+            ->with('category')
+            ->orderBy('reference_month', 'desc')
+            ->get()
+            ->map(function ($b) {
+                return [
+                    'id' => $b->id,
+                    'reference_month' => $b->reference_month,
+                    'limit_value' => $b->limit_value,
+                    'consumed_value' => $b->consumed_value,
+                    'remaining_value' => $b->remaining_value,
+                    'usage_percentage' => $b->usage_percentage,
+                    'status' => $b->status,
+                    'period_type' => $b->period_type,
+                ];
+            });
+
+        return response()->json([
+            'data' => $history,
+            'category' => $budget->category,
+        ]);
+    }
+
+    /**
+     * Get transactions for a category budget period
+     */
+    public function transactions(Request $request, Budget $budget): JsonResponse
+    {
+        if ($budget->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Não autorizado.'], 403);
+        }
+
+        // Parse period and get transactions
+        $refMonth = $budget->reference_month;
+
+        if ($budget->period_type === 'anual') {
+            // Yearly: filter by year only
+            $year = (int) $refMonth;
+            $transactions = \App\Models\Transaction::where('user_id', $request->user()->id)
+                ->where('category_id', $budget->category_id)
+                ->where('type', 'despesa')
+                ->whereYear('date', $year)
+                ->with('category')
+                ->orderBy('date', 'desc')
+                ->limit(100)
+                ->get();
+        } else {
+            // Monthly: filter by year and month
+            $parts = explode('-', $refMonth);
+            $year = (int) $parts[0];
+            $month = (int) ($parts[1] ?? 1);
+
+            $transactions = \App\Models\Transaction::where('user_id', $request->user()->id)
+                ->where('category_id', $budget->category_id)
+                ->where('type', 'despesa')
+                ->whereYear('date', $year)
+                ->whereMonth('date', $month)
+                ->with('category')
+                ->orderBy('date', 'desc')
+                ->limit(100)
+                ->get();
+        }
+
+        return response()->json([
+            'data' => $transactions,
+        ]);
+    }
 }

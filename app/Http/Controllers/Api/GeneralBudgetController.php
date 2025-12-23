@@ -272,7 +272,7 @@ class GeneralBudgetController extends Controller
 
         // Get expense transactions for this period
         $query = \App\Models\Transaction::where('user_id', Auth::id())
-            ->where('type', 'expense')
+            ->where('type', 'despesa')
             ->whereYear('date', $period->reference_year);
 
         if ($period->reference_month) {

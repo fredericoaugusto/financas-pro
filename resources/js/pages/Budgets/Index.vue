@@ -201,7 +201,8 @@
             <div 
                 v-for="budget in budgets" 
                 :key="budget.id"
-                class="card hover:shadow-md transition-shadow"
+                class="card hover:shadow-md transition-shadow cursor-pointer"
+                @click="openCategoryBudgetHistoryModal(budget)"
             >
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-3">
@@ -229,7 +230,7 @@
                         <!-- Actions -->
                         <div class="flex items-center gap-1">
                             <button 
-                                @click="openEditModal(budget)"
+                                @click.stop="openEditModal(budget)"
                                 class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                                 title="Editar"
                             >
@@ -238,7 +239,7 @@
                                 </svg>
                             </button>
                             <button 
-                                @click="confirmDelete(budget)"
+                                @click.stop="confirmDelete(budget)"
                                 class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
                                 title="Remover"
                             >
@@ -499,9 +500,9 @@
                 <div class="flex items-center justify-between p-6 border-b dark:border-gray-700">
                     <div>
                         <h3 class="text-xl font-bold text-gray-900 dark:text-white">
-                            Lançamentos - {{ historyBudget?.name }}
+                            Histórico - {{ historyBudget?.name }}
                         </h3>
-                        <p class="text-sm text-gray-500">{{ getBudgetPeriodLabel(historyBudget) }} • {{ historyBudget?.period_type === 'monthly' ? 'Mensal' : 'Anual' }}</p>
+                        <p class="text-sm text-gray-500">{{ historyBudget?.period_type === 'monthly' ? 'Mensal' : 'Anual' }}</p>
                     </div>
                     <button @click="showTransactionHistoryModal = false" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                         <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -509,6 +510,38 @@
                         </svg>
                     </button>
                 </div>
+                
+                <!-- Period Selector -->
+                <div class="px-6 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <div class="flex items-center gap-4">
+                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Período:</label>
+                        <div class="flex gap-2 overflow-x-auto pb-2">
+                            <button 
+                                v-for="period in historyPeriods" 
+                                :key="period.id"
+                                @click="selectHistoryPeriod(period)"
+                                :class="[
+                                    'px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors',
+                                    selectedHistoryPeriod?.id === period.id 
+                                        ? 'bg-primary-500 text-white' 
+                                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 border'
+                                ]"
+                            >
+                                {{ getHistoryPeriodLabel(period) }}
+                                <span v-if="period.status === 'exceeded'" class="ml-1 text-red-200">⚠</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div v-if="selectedHistoryPeriod" class="mt-2 flex items-center justify-between text-sm">
+                        <span class="text-gray-500">
+                            Limite: {{ formatCurrency(selectedHistoryPeriod.limit_value_snapshot) }}
+                        </span>
+                        <span :class="selectedHistoryPeriod.status === 'exceeded' ? 'text-red-500 font-semibold' : 'text-gray-500'">
+                            Utilizado: {{ formatCurrency(selectedHistoryPeriod.spent) }} ({{ Math.round(selectedHistoryPeriod.percentage) }}%)
+                        </span>
+                    </div>
+                </div>
+
                 <div class="flex-1 overflow-y-auto p-6">
                     <div v-if="loadingHistory" class="text-center py-8">
                         <div class="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full mx-auto"></div>
@@ -533,14 +566,105 @@
                                     <p class="text-sm text-gray-500">{{ tx.category?.name }} • {{ new Date(tx.date).toLocaleDateString('pt-BR') }}</p>
                                 </div>
                             </div>
-                            <span class="font-semibold text-red-600">{{ formatCurrency(tx.amount) }}</span>
+                            <span class="font-semibold text-red-600">{{ formatCurrency(tx.value) }}</span>
                         </div>
                     </div>
                 </div>
                 <div class="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                     <div class="flex justify-between items-center">
                         <span class="font-medium text-gray-700 dark:text-gray-300">Total do período:</span>
-                        <span class="text-xl font-bold text-red-600">{{ formatCurrency(getBudgetSpent(historyBudget)) }}</span>
+                        <span class="text-xl font-bold text-red-600">{{ formatCurrency(selectedHistoryPeriod?.spent || 0) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Budget History Modal -->
+        <div v-if="showCategoryHistoryModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between p-6 border-b dark:border-gray-700">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg"
+                             :style="{ backgroundColor: categoryHistoryBudget?.category?.color || '#888' }">
+                            {{ categoryHistoryBudget?.category?.icon || '📊' }}
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">
+                                Histórico - {{ categoryHistoryBudget?.category?.name }}
+                            </h3>
+                            <p class="text-sm text-gray-500">Orçamentos por período</p>
+                        </div>
+                    </div>
+                    <button @click="showCategoryHistoryModal = false" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Period Selector -->
+                <div class="px-6 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <div class="flex items-center gap-4">
+                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Período:</label>
+                        <div class="flex gap-2 overflow-x-auto pb-2">
+                            <button 
+                                v-for="period in categoryHistoryList" 
+                                :key="period.id"
+                                @click="selectCategoryPeriod(period)"
+                                :class="[
+                                    'px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors',
+                                    selectedCategoryPeriod?.id === period.id 
+                                        ? 'bg-primary-500 text-white' 
+                                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 border'
+                                ]"
+                            >
+                                {{ getCategoryPeriodLabel(period) }}
+                                <span v-if="period.status === 'exceeded'" class="ml-1 text-red-200">⚠</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div v-if="selectedCategoryPeriod" class="mt-2 flex items-center justify-between text-sm">
+                        <span class="text-gray-500">
+                            Limite: {{ formatCurrency(selectedCategoryPeriod.limit_value) }}
+                        </span>
+                        <span :class="selectedCategoryPeriod.status === 'exceeded' ? 'text-red-500 font-semibold' : 'text-gray-500'">
+                            Utilizado: {{ formatCurrency(selectedCategoryPeriod.consumed_value) }} ({{ Math.round(selectedCategoryPeriod.usage_percentage || 0) }}%)
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-6">
+                    <div v-if="loadingCategoryHistory" class="text-center py-8">
+                        <div class="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full mx-auto"></div>
+                        <p class="text-gray-500 mt-2">Carregando...</p>
+                    </div>
+                    <div v-else-if="categoryTransactions.length === 0" class="text-center py-8 text-gray-500">
+                        <svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        Nenhum lançamento neste período
+                    </div>
+                    <div v-else class="space-y-2">
+                        <div v-for="tx in categoryTransactions" :key="tx.id" 
+                             class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg"
+                                     :style="{ backgroundColor: tx.category?.color || '#888' }">
+                                    {{ tx.category?.icon || '💰' }}
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ tx.description }}</p>
+                                    <p class="text-sm text-gray-500">{{ new Date(tx.date).toLocaleDateString('pt-BR') }}</p>
+                                </div>
+                            </div>
+                            <span class="font-semibold text-red-600">{{ formatCurrency(tx.value) }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                    <div class="flex justify-between items-center">
+                        <span class="font-medium text-gray-700 dark:text-gray-300">Total do período:</span>
+                        <span class="text-xl font-bold text-red-600">{{ formatCurrency(selectedCategoryPeriod?.consumed_value || 0) }}</span>
                     </div>
                 </div>
             </div>
@@ -715,26 +839,131 @@ const showTransactionHistoryModal = ref(false);
 const historyBudget = ref(null);
 const historyTransactions = ref([]);
 const loadingHistory = ref(false);
+const historyPeriods = ref([]);
+const selectedHistoryPeriod = ref(null);
 
 async function openTransactionHistoryModal(budget) {
     historyBudget.value = budget;
     showTransactionHistoryModal.value = true;
     loadingHistory.value = true;
+    historyTransactions.value = [];
     
+    // Get all periods from budget, ordered by most recent first
+    const periods = budget.periods || [];
+    historyPeriods.value = [...periods].sort((a, b) => {
+        if (a.reference_year !== b.reference_year) return b.reference_year - a.reference_year;
+        return (b.reference_month || 0) - (a.reference_month || 0);
+    });
+    
+    // Select current period by default
+    const currentPeriod = getBudgetCurrentPeriod(budget);
+    if (currentPeriod) {
+        selectedHistoryPeriod.value = currentPeriod;
+        await loadPeriodTransactions(currentPeriod.id);
+    } else if (historyPeriods.value.length > 0) {
+        selectedHistoryPeriod.value = historyPeriods.value[0];
+        await loadPeriodTransactions(historyPeriods.value[0].id);
+    } else {
+        selectedHistoryPeriod.value = null;
+        historyTransactions.value = [];
+        loadingHistory.value = false;
+    }
+}
+
+async function selectHistoryPeriod(period) {
+    if (selectedHistoryPeriod.value?.id === period.id) return;
+    selectedHistoryPeriod.value = period;
+    await loadPeriodTransactions(period.id);
+}
+
+async function loadPeriodTransactions(periodId) {
+    loadingHistory.value = true;
     try {
-        // Load transactions from current period
-        const period = getBudgetCurrentPeriod(budget);
-        if (period) {
-            const response = await axios.get(`/api/general-budget-periods/${period.id}/transactions`);
-            historyTransactions.value = response.data.data || [];
-        } else {
-            historyTransactions.value = [];
-        }
+        const response = await axios.get(`/api/general-budget-periods/${periodId}/transactions`);
+        historyTransactions.value = response.data.data || [];
     } catch (e) {
         console.error('Error loading transactions:', e);
         historyTransactions.value = [];
     }
     loadingHistory.value = false;
+}
+
+function getHistoryPeriodLabel(period) {
+    if (!period) return '';
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    if (period.reference_month) {
+        return months[period.reference_month - 1] + '/' + period.reference_year;
+    }
+    return String(period.reference_year);
+}
+
+// Category Budget History Modal
+const showCategoryHistoryModal = ref(false);
+const categoryHistoryBudget = ref(null);
+const categoryHistoryList = ref([]);
+const selectedCategoryPeriod = ref(null);
+const categoryTransactions = ref([]);
+const loadingCategoryHistory = ref(false);
+
+async function openCategoryBudgetHistoryModal(budget) {
+    categoryHistoryBudget.value = budget;
+    showCategoryHistoryModal.value = true;
+    loadingCategoryHistory.value = true;
+    categoryTransactions.value = [];
+    
+    try {
+        // Load all historical periods for this category
+        const response = await axios.get(`/api/budgets/${budget.id}/history`);
+        categoryHistoryList.value = response.data.data || [];
+        
+        // Select current budget by default
+        const current = categoryHistoryList.value.find(b => b.id === budget.id);
+        if (current) {
+            selectedCategoryPeriod.value = current;
+            await loadCategoryPeriodTransactions(budget.id);
+        } else if (categoryHistoryList.value.length > 0) {
+            selectedCategoryPeriod.value = categoryHistoryList.value[0];
+            await loadCategoryPeriodTransactions(categoryHistoryList.value[0].id);
+        } else {
+            selectedCategoryPeriod.value = null;
+            loadingCategoryHistory.value = false;
+        }
+    } catch (e) {
+        console.error('Error loading category history:', e);
+        categoryHistoryList.value = [];
+        loadingCategoryHistory.value = false;
+    }
+}
+
+async function selectCategoryPeriod(period) {
+    if (selectedCategoryPeriod.value?.id === period.id) return;
+    selectedCategoryPeriod.value = period;
+    await loadCategoryPeriodTransactions(period.id);
+}
+
+async function loadCategoryPeriodTransactions(budgetId) {
+    loadingCategoryHistory.value = true;
+    try {
+        const response = await axios.get(`/api/budgets/${budgetId}/transactions`);
+        categoryTransactions.value = response.data.data || [];
+    } catch (e) {
+        console.error('Error loading category transactions:', e);
+        categoryTransactions.value = [];
+    }
+    loadingCategoryHistory.value = false;
+}
+
+function getCategoryPeriodLabel(period) {
+    if (!period) return '';
+    const ref = period.reference_month;
+    if (!ref) return '';
+    // Format: 2024-12 -> Dez/2024 or 2024 -> 2024
+    if (ref.includes('-')) {
+        const [year, month] = ref.split('-');
+        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        return months[parseInt(month) - 1] + '/' + year;
+    }
+    return ref;
 }
 
 // General Budget Modal state

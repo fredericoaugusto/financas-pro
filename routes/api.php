@@ -83,6 +83,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Budgets (Orçamentos por Categoria)
     Route::apiResource('budgets', BudgetController::class)->except(['show']);
     Route::get('budgets/summary', [BudgetController::class, 'summary']);
+    Route::get('budgets/{budget}/history', [BudgetController::class, 'history']);
+    Route::get('budgets/{budget}/transactions', [BudgetController::class, 'transactions']);
 
     // General Budgets (Orçamento Geral)
     Route::apiResource('general-budgets', GeneralBudgetController::class);
