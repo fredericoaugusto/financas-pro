@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\GoalController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ImportController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\BackupController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -138,4 +139,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+    // Backup & Restore
+    Route::get('backup/export', [BackupController::class, 'export']);
+    Route::post('backup/preview', [BackupController::class, 'preview']);
+    Route::post('backup/import', [BackupController::class, 'import']);
 });

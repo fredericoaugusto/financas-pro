@@ -22,6 +22,7 @@ import Charts from '@/pages/Charts/Index.vue';
 import Calendar from '@/pages/Calendar/Index.vue';
 import Import from '@/pages/Import/Index.vue';
 import Notifications from '@/pages/Notifications/Index.vue';
+import Backup from '@/pages/Backup/Index.vue';
 import Settings from '@/pages/Settings.vue';
 
 const routes = [
@@ -180,6 +181,14 @@ const routes = [
         path: '/notifications',
         name: 'notifications',
         component: Notifications,
+        meta: { auth: true },
+    },
+
+    // Backup
+    {
+        path: '/backup',
+        name: 'backup',
+        component: Backup,
         meta: { auth: true },
     },
 

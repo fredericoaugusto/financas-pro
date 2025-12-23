@@ -98,12 +98,12 @@
                 <div class="space-y-4">
                     <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                         <div>
-                            <p class="font-medium text-gray-900 dark:text-white">Exportar dados</p>
-                            <p class="text-sm text-gray-500">Baixe todos os seus dados em CSV</p>
+                            <p class="font-medium text-gray-900 dark:text-white">Backup & Restauração</p>
+                            <p class="text-sm text-gray-500">Exporte ou restaure seus dados</p>
                         </div>
-                        <button class="btn-secondary">
-                            Exportar
-                        </button>
+                        <RouterLink to="/backup" class="btn-secondary">
+                            Fazer Backup
+                        </RouterLink>
                     </div>
 
                     <div class="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
