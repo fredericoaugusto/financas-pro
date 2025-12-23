@@ -16,9 +16,9 @@
 
         <div v-else-if="!hasData" class="text-center py-12 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
             <div class="text-4xl mb-4">📊</div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Ainda analisando seus dados</h3>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Ainda aprendendo sobre seus hábitos</h3>
             <p class="text-gray-500 mt-2 max-w-md mx-auto">
-                Precisamos de mais histórico para gerar insights precisos. Continue registrando suas transações!
+                Registre mais alguns meses de transações para receber insights completos e precisos sobre sua vida financeira.
             </p>
         </div>
 
@@ -27,12 +27,25 @@
             <!-- Left Column: Score & Stability -->
             <div class="lg:col-span-1 space-y-6">
                 <!-- Score Card -->
-                <div class="card relative overflow-hidden">
-                    <div class="absolute top-0 right-0 p-4 opacity-10">
-                        <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.86 0 .92-.81 1.42-2.19 1.42-1.47 0-2.19-.66-2.26-1.63H7.96c.06 1.72 1.14 2.76 2.94 3.09V19h2.38v-1.72c1.69-.34 2.91-1.37 2.91-2.92 0-1.72-1.34-2.65-3.88-3.22z"/></svg>
+                <div class="card relative overflow-visible">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Score de Organização</h3>
+                        <div class="relative group">
+                            <span class="cursor-help text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                ℹ️
+                            </span>
+                            <div class="absolute right-0 w-64 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 invisible group-hover:visible z-50 transition-opacity opacity-0 group-hover:opacity-100 mb-2 bottom-full">
+                                <p class="font-semibold mb-2 text-gray-700 dark:text-gray-300">Como calculamos isso?</p>
+                                <ul class="list-disc pl-4 space-y-1">
+                                    <li>Estabilidade financeira</li>
+                                    <li>Frequência de saldo positivo</li>
+                                    <li>Controle de orçamento</li>
+                                    <li>Baixo número de imprevistos</li>
+                                    <li>Existência de objetivos</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Score de Organização</h3>
                     
                     <div class="flex flex-col items-center justify-center py-4">
                         <div class="relative w-32 h-32 flex items-center justify-center">
@@ -105,31 +118,32 @@
             <div class="lg:col-span-2 space-y-6">
                 
                 <!-- Anomalies (Alerts) -->
-                <div v-if="insights.anomalies.length" class="card border-l-4 border-red-500">
+                <div v-if="insights.anomalies.length" class="card border-l-4 border-orange-500">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                             <span>⚠️</span> Atenção: Gastos Atípicos
                         </h3>
                     </div>
                     <div class="space-y-3">
-                        <div v-for="(anomaly, idx) in insights.anomalies" :key="idx" 
-                             class="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/10 rounded-lg">
+                        <RouterLink v-for="(anomaly, idx) in insights.anomalies" :key="idx" 
+                             to="/transactions"
+                             class="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/10 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/20 transition-colors group">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 flex items-center justify-center font-bold">
+                                <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center font-bold">
                                     !
                                 </div>
                                 <div>
-                                    <p class="font-medium text-gray-900 dark:text-white">{{ anomaly.category_name }}</p>
+                                    <p class="font-medium text-gray-900 dark:text-white group-hover:text-primary-600">{{ anomaly.category_name }}</p>
                                     <p class="text-sm text-gray-600 dark:text-gray-400">
                                         {{ anomaly.percentage_above }}% acima da média em {{ formatPeriod(anomaly.month) }}
                                     </p>
                                 </div>
                             </div>
                             <div class="text-right">
-                                <p class="font-bold text-red-600 dark:text-red-400">{{ formatCurrency(anomaly.value) }}</p>
+                                <p class="font-bold text-orange-600 dark:text-orange-400">{{ formatCurrency(anomaly.value) }}</p>
                                 <p class="text-xs text-gray-500">Média: {{ formatCurrency(anomaly.average) }}</p>
                             </div>
-                        </div>
+                        </RouterLink>
                     </div>
                 </div>
 
@@ -211,6 +225,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { RouterLink } from 'vue-router';
 
 const loading = ref(true);
 const hasData = ref(false);
@@ -237,18 +252,18 @@ function getScoreColorClass(score) {
     if (score >= 80) return 'text-green-500';
     if (score >= 60) return 'text-blue-500';
     if (score >= 40) return 'text-yellow-500';
-    return 'text-red-500';
+    return 'text-orange-500';
 }
 
 function getScoreTextClass(score) {
     if (score >= 80) return 'text-green-600 dark:text-green-400';
     if (score >= 60) return 'text-blue-600 dark:text-blue-400';
     if (score >= 40) return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-red-600 dark:text-red-400';
+    return 'text-orange-600 dark:text-orange-400';
 }
 
 function getTrendColor(status) {
-    if (status === 'increased') return 'text-red-500'; // Despesa aumentou = ruim
+    if (status === 'increased') return 'text-orange-500'; // Despesa aumentou = atenção
     if (status === 'decreased') return 'text-green-500'; // Despesa caiu = bom
     return 'text-gray-500';
 }
