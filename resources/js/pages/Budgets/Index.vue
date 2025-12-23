@@ -663,10 +663,10 @@ function setPeriodType(type) {
 }
 
 async function loadData() {
-    budgetsStore.setPeriod(currentPeriod.value, periodType.value);
+    budgetsStore.setPeriod(currentBudgetPeriodString.value, periodType.value);
     await Promise.all([
-        budgetsStore.fetchBudgets(currentPeriod.value, periodType.value),
-        budgetsStore.fetchSummary(currentPeriod.value, periodType.value),
+        budgetsStore.fetchBudgets(currentBudgetPeriodString.value, periodType.value),
+        budgetsStore.fetchSummary(currentBudgetPeriodString.value, periodType.value),
         categoriesStore.fetchCategories(),
     ]);
 }
