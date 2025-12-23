@@ -21,12 +21,10 @@ class ImportDetectionService
     public const UI_RED = 'red';
     public const UI_BLUE = 'blue';
 
+    // Payment methods valid for OFX bank statement import (no credit card here)
     private array $paymentMethodPatterns = [
         'pix' => ['pix', 'chave pix', 'pix recebido', 'pix enviado'],
-        'debit' => ['débito', 'debito', 'via débito', 'via debito', 'compra no débito', 'compra débito'],
-        'credit' => ['crédito', 'credito', 'via crédito', 'via credito', 'compra no crédito', 'parcelado'],
-        'transfer' => ['ted', 'doc', 'transferência', 'transferencia', 'transf'],
-        'boleto' => ['boleto', 'pagamento de boleto', 'compensação'],
+        'debit' => ['débito', 'debito', 'via débito', 'via debito', 'compra no débito', 'compra débito', 'nu pay', 'nupay', 'pagamento de fatura'],
     ];
 
     // Patterns for matching category names in database
@@ -157,9 +155,15 @@ class ImportDetectionService
 
     private function detectCategory(string $description, ?string $paymentMethod): ?int
     {
-        // Don't suggest category for generic payment methods
-        if (in_array($paymentMethod, ['pix', 'transfer', 'boleto'])) {
-            $lower = Str::lower($description);
+        $lower = Str::lower($description);
+
+        // Don't suggest category for pagamento de fatura (it's a payment, not a purchase)
+        if (Str::contains($lower, 'pagamento de fatura')) {
+            return null;
+        }
+
+        // For PIX, only suggest if we have a high-confidence match
+        if ($paymentMethod === 'pix') {
             foreach ($this->categoryPatterns as $categoryName => $patterns) {
                 foreach ($patterns as $pattern) {
                     if (Str::contains($lower, $pattern)) {
@@ -167,10 +171,10 @@ class ImportDetectionService
                     }
                 }
             }
-            return null;
+            return null; // No category for generic PIX
         }
 
-        $lower = Str::lower($description);
+        // For debit, try to match patterns
         foreach ($this->categoryPatterns as $categoryName => $patterns) {
             foreach ($patterns as $pattern) {
                 if (Str::contains($lower, $pattern)) {
@@ -191,8 +195,10 @@ class ImportDetectionService
 
     private function detectCard(string $description, ?string $paymentMethod): ?int
     {
-        if (!in_array($paymentMethod, ['credit', 'debit']))
+        // In OFX context, only debit cards are relevant (no credit card transactions)
+        if ($paymentMethod !== 'debit') {
             return null;
+        }
 
         $lower = Str::lower($description);
         foreach ($this->cardPatterns as $brand => $patterns) {
@@ -207,10 +213,6 @@ class ImportDetectionService
                         return $card->id;
                 }
             }
-        }
-
-        if ($paymentMethod === 'credit' && $this->userCards->isNotEmpty()) {
-            return $this->userCards->first()?->id;
         }
         return null;
     }
@@ -280,15 +282,15 @@ class ImportDetectionService
         };
     }
 
+    /**
+     * Get available payment methods for OFX import context.
+     * Only PIX and Débito make sense for bank statements.
+     */
     public function getAvailablePaymentMethods(): array
     {
         return [
             'pix' => 'PIX',
             'debit' => 'Débito',
-            'credit' => 'Crédito',
-            'transfer' => 'Transferência',
-            'boleto' => 'Boleto',
-            'dinheiro' => 'Dinheiro',
         ];
     }
 }
