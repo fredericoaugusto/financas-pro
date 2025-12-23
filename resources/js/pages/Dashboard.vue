@@ -222,10 +222,10 @@
                     </RouterLink>
                 </div>
 
-                <!-- General Budget Section -->
+                <!-- General Budget Section (Monthly) -->
                 <div v-if="generalBudget" class="mb-4">
-                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Orçamento Geral</p>
-                    <RouterLink to="/budgets" class="block p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Orçamento Mensal</p>
+                    <RouterLink v-if="selectedMonthlyPeriod" to="/budgets" class="block p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-lg">
@@ -234,7 +234,7 @@
                                 <div>
                                     <p class="font-medium text-gray-900 dark:text-white">{{ generalBudget.name }}</p>
                                     <p class="text-xs text-gray-500">
-                                        {{ formatCurrency(generalBudgetSpent) }} de {{ formatCurrency(generalBudget.limit_value) }}
+                                        {{ formatCurrency(generalBudgetSpent) }} de {{ formatCurrency(selectedMonthlyPeriod.limit_value_snapshot || generalBudget.limit_value) }}
                                     </p>
                                 </div>
                             </div>
@@ -250,6 +250,9 @@
                             ></div>
                         </div>
                     </RouterLink>
+                    <div v-else class="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-center text-gray-500 text-sm">
+                        Sem dados para este mês
+                    </div>
                 </div>
 
                 <!-- Category Budgets Section -->
@@ -292,8 +295,8 @@
 
                 <!-- Annual Budget Section -->
                 <div v-if="annualBudget" class="mt-4 pt-4 border-t dark:border-gray-700">
-                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Orçamento Anual</p>
-                    <RouterLink to="/budgets" class="block p-4 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 hover:from-purple-100 hover:to-indigo-100 dark:hover:from-purple-900/30 dark:hover:to-indigo-900/30 transition-colors">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Orçamento Anual ({{ selectedYear }})</p>
+                    <RouterLink v-if="selectedAnnualPeriod" to="/budgets" class="block p-4 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 hover:from-purple-100 hover:to-indigo-100 dark:hover:from-purple-900/30 dark:hover:to-indigo-900/30 transition-colors">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-white text-lg">
@@ -302,7 +305,7 @@
                                 <div>
                                     <p class="font-medium text-gray-900 dark:text-white">{{ annualBudget.name }}</p>
                                     <p class="text-xs text-gray-500">
-                                        {{ formatCurrency(annualBudgetSpent) }} de {{ formatCurrency(annualBudget.limit_value) }}
+                                        {{ formatCurrency(annualBudgetSpent) }} de {{ formatCurrency(selectedAnnualPeriod.limit_value_snapshot || annualBudget.limit_value) }}
                                     </p>
                                 </div>
                             </div>
@@ -318,6 +321,9 @@
                             ></div>
                         </div>
                     </RouterLink>
+                    <div v-else class="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-center text-gray-500 text-sm">
+                        Sem dados para este ano
+                    </div>
                 </div>
 
                 <div v-if="!generalBudget && !annualBudget && categoryBudgets.length === 0" class="text-center py-8 text-gray-500">
@@ -382,15 +388,19 @@ const generalBudget = ref(null);
 const annualBudget = ref(null);
 const categoryBudgets = ref([]);
 
-// General budget computed values (monthly)
+// Selected period for the current view (based on selectedMonth/selectedYear)
+const selectedMonthlyPeriod = ref(null);
+const selectedAnnualPeriod = ref(null);
+
+// General budget computed values (monthly) - uses selected period
 const generalBudgetSpent = computed(() => {
-    if (!generalBudget.value?.current_period) return 0;
-    return parseFloat(generalBudget.value.current_period.spent) || 0;
+    if (!selectedMonthlyPeriod.value) return 0;
+    return parseFloat(selectedMonthlyPeriod.value.spent) || 0;
 });
 
 const generalBudgetPercentage = computed(() => {
-    if (!generalBudget.value) return 0;
-    const limit = parseFloat(generalBudget.value.limit_value) || 1;
+    if (!selectedMonthlyPeriod.value) return 0;
+    const limit = parseFloat(selectedMonthlyPeriod.value.limit_value_snapshot) || parseFloat(generalBudget.value?.limit_value) || 1;
     return (generalBudgetSpent.value / limit) * 100;
 });
 
@@ -401,15 +411,15 @@ const generalBudgetStatus = computed(() => {
     return 'ok';
 });
 
-// Annual budget computed values
+// Annual budget computed values - uses selected period
 const annualBudgetSpent = computed(() => {
-    if (!annualBudget.value?.current_period) return 0;
-    return parseFloat(annualBudget.value.current_period.spent) || 0;
+    if (!selectedAnnualPeriod.value) return 0;
+    return parseFloat(selectedAnnualPeriod.value.spent) || 0;
 });
 
 const annualBudgetPercentage = computed(() => {
-    if (!annualBudget.value) return 0;
-    const limit = parseFloat(annualBudget.value.limit_value) || 1;
+    if (!selectedAnnualPeriod.value) return 0;
+    const limit = parseFloat(selectedAnnualPeriod.value.limit_value_snapshot) || parseFloat(annualBudget.value?.limit_value) || 1;
     return (annualBudgetSpent.value / limit) * 100;
 });
 
@@ -427,6 +437,19 @@ function getGeneralBudgetStatusClass(status) {
         exceeded: 'text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
     };
     return classes[status] || classes.ok;
+}
+
+// Helper function to find the correct period from periods array
+function findPeriodForSelection(periods, year, month, isYearly = false) {
+    if (!periods || !Array.isArray(periods)) return null;
+    
+    if (isYearly) {
+        // For yearly budgets, find by reference_year only (reference_month is null)
+        return periods.find(p => p.reference_year === year && !p.reference_month) || null;
+    } else {
+        // For monthly budgets, find by reference_year and reference_month
+        return periods.find(p => p.reference_year === year && p.reference_month === month) || null;
+    }
 }
 
 async function loadBudgetData() {
@@ -448,8 +471,31 @@ async function loadBudgetData() {
             annualBudget.value = budgetsData.yearly || budgetsData.annual || null;
         }
         
-        console.log('Monthly budget:', generalBudget.value);
-        console.log('Annual budget:', annualBudget.value);
+        // Find the correct period for the selected month/year
+        if (generalBudget.value && generalBudget.value.periods) {
+            selectedMonthlyPeriod.value = findPeriodForSelection(
+                generalBudget.value.periods, 
+                selectedYear.value, 
+                selectedMonth.value, 
+                false
+            );
+            console.log('Selected monthly period:', selectedMonthlyPeriod.value);
+        } else {
+            selectedMonthlyPeriod.value = null;
+        }
+        
+        // For annual budget, find period for the selected year
+        if (annualBudget.value && annualBudget.value.periods) {
+            selectedAnnualPeriod.value = findPeriodForSelection(
+                annualBudget.value.periods, 
+                selectedYear.value, 
+                null, 
+                true
+            );
+            console.log('Selected annual period:', selectedAnnualPeriod.value);
+        } else {
+            selectedAnnualPeriod.value = null;
+        }
 
         // Load category budgets for current period
         const period = `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}`;
