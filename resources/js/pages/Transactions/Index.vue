@@ -5,12 +5,41 @@
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Lançamentos</h1>
                 <p class="text-gray-500 dark:text-gray-400">Todas as suas transações</p>
             </div>
-            <RouterLink to="/transactions/create" class="btn-primary">
-                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-                Novo Lançamento
-            </RouterLink>
+            <div class="flex items-center gap-3">
+                <!-- Export Dropdown -->
+                <div class="relative" ref="exportDropdown">
+                    <button @click="showExportMenu = !showExportMenu" class="btn-secondary flex items-center gap-2" :disabled="exporting">
+                        <svg v-if="exporting" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Exportar
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div v-if="showExportMenu" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                        <button @click="exportPdf" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex items-center gap-2 rounded-t-lg">
+                            <span class="text-red-500">📄</span> Exportar PDF
+                        </button>
+                        <button @click="exportCsv" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                            <span class="text-green-500">📊</span> Exportar Excel/CSV
+                        </button>
+                        <button @click="exportSummaryPdf" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex items-center gap-2 rounded-b-lg border-t border-gray-200 dark:border-gray-700">
+                            <span class="text-blue-500">📈</span> Resumo Financeiro
+                        </button>
+                    </div>
+                </div>
+                <RouterLink to="/transactions/create" class="btn-primary">
+                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Novo Lançamento
+                </RouterLink>
+            </div>
         </div>
 
 
@@ -579,6 +608,13 @@ const refundValue = ref(0);
 const showAnticipateModal = ref(false);
 const transactionToAnticipate = ref(null);
 
+// Export state
+const showExportMenu = ref(false);
+const exporting = ref(false);
+const exportDropdown = ref(null);
+
+import axios from 'axios';
+
 import { useCategoriesStore } from '@/stores/categories';
 import { useFilters } from '@/composables/useFilters';
 
@@ -798,6 +834,103 @@ function setPeriod(period) {
     });
 }
 
+// Build query string from current filters
+function buildExportQueryString() {
+    const f = transactionsStore.filters;
+    const params = new URLSearchParams();
+    if (f.date_from) params.append('start_date', f.date_from);
+    if (f.date_to) params.append('end_date', f.date_to);
+    if (f.type) params.append('type', f.type);
+    if (f.account_id) params.append('account_id', f.account_id);
+    if (f.category_id) params.append('category_id', f.category_id);
+    if (f.search) params.append('search', f.search);
+    return params.toString();
+}
+
+// Export functions
+async function exportPdf() {
+    showExportMenu.value = false;
+    if (transactionsStore.transactions.length === 0) {
+        alert('Nenhuma transação encontrada para exportar.');
+        return;
+    }
+    exporting.value = true;
+    try {
+        const response = await axios.get(`/api/reports/transactions/pdf?${buildExportQueryString()}`, {
+            responseType: 'blob'
+        });
+        downloadBlob(response.data, 'transacoes.pdf', 'application/pdf');
+    } catch (err) {
+        console.error('Export PDF error:', err);
+        alert(err.response?.data?.message || 'Erro ao exportar PDF');
+    } finally {
+        exporting.value = false;
+    }
+}
+
+async function exportCsv() {
+    showExportMenu.value = false;
+    if (transactionsStore.transactions.length === 0) {
+        alert('Nenhuma transação encontrada para exportar.');
+        return;
+    }
+    exporting.value = true;
+    try {
+        const response = await axios.get(`/api/reports/transactions/csv?${buildExportQueryString()}`, {
+            responseType: 'blob'
+        });
+        downloadBlob(response.data, 'transacoes.csv', 'text/csv');
+    } catch (err) {
+        console.error('Export CSV error:', err);
+        alert(err.response?.data?.message || 'Erro ao exportar CSV');
+    } finally {
+        exporting.value = false;
+    }
+}
+
+async function exportSummaryPdf() {
+    showExportMenu.value = false;
+    exporting.value = true;
+    try {
+        const response = await axios.get(`/api/reports/summary/pdf?${buildExportQueryString()}`, {
+            responseType: 'blob'
+        });
+        downloadBlob(response.data, 'resumo_financeiro.pdf', 'application/pdf');
+    } catch (err) {
+        console.error('Export Summary error:', err);
+        alert(err.response?.data?.message || 'Erro ao exportar resumo');
+    } finally {
+        exporting.value = false;
+    }
+}
+
+function downloadBlob(blob, filename, type) {
+    const url = window.URL.createObjectURL(new Blob([blob], { type }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+}
+
+// Close export dropdown on click outside
+import { onMounted as onMountedHook, onUnmounted } from 'vue';
+
+function handleClickOutside(event) {
+    if (exportDropdown.value && !exportDropdown.value.contains(event.target)) {
+        showExportMenu.value = false;
+    }
+}
+
+onMountedHook(() => {
+    document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('click', handleClickOutside);
+});
 
 
 </script>

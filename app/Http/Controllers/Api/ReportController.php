@@ -4,338 +4,262 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
-use App\Models\Card;
+use App\Models\Category;
 use App\Models\Transaction;
-use App\Models\CardInvoice;
-use App\Services\TransactionFilterService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 
 class ReportController extends Controller
 {
-    protected TransactionFilterService $filterService;
-
-    public function __construct(TransactionFilterService $filterService)
-    {
-        $this->filterService = $filterService;
-    }
     /**
-     * Dados do dashboard principal
+     * Export transactions as PDF.
      */
-    public function dashboard(Request $request): JsonResponse
+    public function transactionsPdf(Request $request)
     {
-        $userId = $request->user()->id;
-        $now = Carbon::now();
-        $startOfMonth = $now->copy()->startOfMonth();
-        $endOfMonth = $now->copy()->endOfMonth();
+        $data = $this->getTransactionsData($request);
 
-        // Saldo total das contas
-        $totalBalance = Account::where('user_id', $userId)
-            ->where('is_active', true)
-            ->get()
-            ->sum('current_balance');
+        if ($data['transactions']->isEmpty()) {
+            return response()->json(['message' => 'Nenhuma transação encontrada para exportar.'], 422);
+        }
 
-        // Receitas do mês
-        $monthIncome = Transaction::where('user_id', $userId)
-            ->where('type', 'receita')
-            ->where('affects_balance', true)
-            ->where('status', 'confirmada')
-            ->whereBetween('date', [$startOfMonth, $endOfMonth])
-            ->sum('value');
+        $pdf = Pdf::loadView('reports.transactions', $data);
+        $pdf->setPaper('a4', 'portrait');
 
-        // Despesas do mês
-        $monthExpenses = Transaction::where('user_id', $userId)
-            ->where('type', 'despesa')
-            ->where('affects_balance', true)
-            ->where('status', 'confirmada')
-            ->whereBetween('date', [$startOfMonth, $endOfMonth])
-            ->sum('value');
+        $filename = 'transacoes_' . Carbon::now()->format('Y-m-d_His') . '.pdf';
 
-        // Faturas em aberto
-        $openInvoices = CardInvoice::whereHas('card', function ($query) use ($userId) {
-            $query->where('user_id', $userId);
-        })
-            ->whereIn('status', ['aberta', 'fechada', 'parcialmente_paga'])
-            ->sum(DB::raw('total_value - paid_value'));
-
-        // Gastos por categoria (últimos 30 dias)
-        $expensesByCategory = Transaction::where('user_id', $userId)
-            ->where('type', 'despesa')
-            ->where('affects_balance', true)
-            ->where('status', 'confirmada')
-            ->where('date', '>=', $now->copy()->subDays(30))
-            ->with('category')
-            ->get()
-            ->groupBy('category_id')
-            ->map(function ($transactions) {
-                $category = $transactions->first()->category;
-                return [
-                    'category' => $category ? $category->name : 'Sem categoria',
-                    'color' => $category ? $category->color : '#6b7280',
-                    'total' => $transactions->sum('value'),
-                ];
-            })
-            ->values();
-
-        // Transações recentes
-        $recentTransactions = Transaction::where('user_id', $userId)
-            ->where('affects_balance', true)
-            ->with(['account', 'card', 'category'])
-            ->orderBy('date', 'desc')
-            ->orderBy('id', 'desc')
-            ->take(5)
-            ->get();
-
-        // Próximas contas (faturas próximas)
-        $upcomingBills = CardInvoice::whereHas('card', function ($query) use ($userId) {
-            $query->where('user_id', $userId);
-        })
-            ->whereIn('status', ['aberta', 'fechada'])
-            ->where('due_date', '>=', $now)
-            ->orderBy('due_date')
-            ->take(5)
-            ->with('card')
-            ->get()
-            ->map(function ($invoice) {
-                return [
-                    'id' => $invoice->id,
-                    'description' => "Fatura {$invoice->card->name}",
-                    'due_date' => $invoice->due_date,
-                    'value' => $invoice->total_value - $invoice->paid_value,
-                ];
-            });
-
-        return response()->json([
-            'data' => [
-                'total_balance' => round($totalBalance, 2),
-                'month_income' => round($monthIncome, 2),
-                'month_expenses' => round($monthExpenses, 2),
-                'open_invoices' => round($openInvoices, 2),
-                'balance_trend' => 0, // TODO: calcular tendência
-                'income_trend' => 0,
-                'expenses_trend' => 0,
-                'expenses_by_category' => $expensesByCategory,
-                'recent_transactions' => $recentTransactions,
-                'upcoming_bills' => $upcomingBills,
-            ],
-        ]);
+        return $pdf->download($filename);
     }
 
     /**
-     * Relatório de um período específico
+     * Export transactions as CSV (Excel-compatible).
      */
-    public function period(Request $request): JsonResponse
+    public function transactionsCsv(Request $request)
     {
-        $validated = $request->validate([
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-        ]);
+        $data = $this->getTransactionsData($request);
 
-        $userId = $request->user()->id;
-        $startDate = Carbon::parse($validated['start_date']);
-        $endDate = Carbon::parse($validated['end_date']);
+        if ($data['transactions']->isEmpty()) {
+            return response()->json(['message' => 'Nenhuma transação encontrada para exportar.'], 422);
+        }
 
-        $transactions = Transaction::where('user_id', $userId)
-            ->where('affects_balance', true)
-            ->where('status', 'confirmada')
-            ->whereBetween('date', [$startDate, $endDate])
-            ->with('category')
-            ->get();
+        $filename = 'transacoes_' . Carbon::now()->format('Y-m-d_His') . '.csv';
 
-        $income = $transactions->where('type', 'receita')->sum('value');
-        $expenses = $transactions->where('type', 'despesa')->sum('value');
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
 
-        $byCategory = $transactions
-            ->where('type', 'despesa')
-            ->groupBy('category_id')
-            ->map(function ($items) {
-                $category = $items->first()->category;
-                return [
-                    'category' => $category ? $category->name : 'Sem categoria',
-                    'total' => $items->sum('value'),
-                    'count' => $items->count(),
-                ];
-            })
-            ->sortByDesc('total')
-            ->values();
+        $callback = function () use ($data) {
+            $file = fopen('php://output', 'w');
 
-        return response()->json([
-            'data' => [
-                'period' => [
-                    'start' => $startDate->toDateString(),
-                    'end' => $endDate->toDateString(),
-                ],
-                'summary' => [
-                    'income' => round($income, 2),
-                    'expenses' => round($expenses, 2),
-                    'balance' => round($income - $expenses, 2),
-                ],
-                'by_category' => $byCategory,
-                'transaction_count' => $transactions->count(),
-            ],
-        ]);
-    }
-    public function summary(Request $request): JsonResponse
-    {
-        $filters = $this->filterService->extractFilters($request->all());
-        $data = $this->filterService->getAggregations($request->user()->id, $filters);
-        return response()->json(['data' => $data]);
+            // Add BOM for Excel UTF-8 compatibility
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            // Header info
+            fputcsv($file, ['FinançasPro - Relatório de Transações'], ';');
+            fputcsv($file, ['Período: ' . $data['period_label']], ';');
+            fputcsv($file, ['Gerado em: ' . $data['generated_at']], ';');
+            fputcsv($file, [], ';');
+
+            // Column headers
+            fputcsv($file, ['Data', 'Descrição', 'Tipo', 'Forma Pgto', 'Categoria', 'Conta', 'Valor'], ';');
+
+            // Data rows
+            foreach ($data['transactions'] as $tx) {
+                fputcsv($file, [
+                    Carbon::parse($tx->date)->format('d/m/Y'),
+                    $tx->description,
+                    ucfirst($tx->type),
+                    $this->formatPaymentMethod($tx->payment_method),
+                    $tx->category?->name ?? '-',
+                    $tx->account?->name ?? '-',
+                    number_format($tx->value, 2, ',', '.'),
+                ], ';');
+            }
+
+            // Totals
+            fputcsv($file, [], ';');
+            fputcsv($file, ['', '', '', '', '', 'Total Receitas:', number_format($data['totals']['income'], 2, ',', '.')], ';');
+            fputcsv($file, ['', '', '', '', '', 'Total Despesas:', number_format($data['totals']['expense'], 2, ',', '.')], ';');
+            fputcsv($file, ['', '', '', '', '', 'Saldo:', number_format($data['totals']['balance'], 2, ',', '.')], ';');
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
-    public function byCategory(Request $request): JsonResponse
+    /**
+     * Export financial summary as PDF.
+     */
+    public function summaryPdf(Request $request)
     {
-        $filters = $this->filterService->extractFilters($request->all());
-        $data = $this->filterService->getByCategory($request->user()->id, $filters);
-        return response()->json(['data' => $data]);
+        $data = $this->getSummaryData($request);
+
+        $pdf = Pdf::loadView('reports.summary', $data);
+        $pdf->setPaper('a4', 'portrait');
+
+        $filename = 'resumo_financeiro_' . Carbon::now()->format('Y-m-d_His') . '.pdf';
+
+        return $pdf->download($filename);
     }
 
-    public function byAccount(Request $request): JsonResponse
+    /**
+     * Get transactions data for export.
+     */
+    private function getTransactionsData(Request $request): array
     {
-        $filters = $this->filterService->extractFilters($request->all());
-        $data = $this->filterService->getByAccount($request->user()->id, $filters);
-        return response()->json(['data' => $data]);
-    }
-
-    public function monthlyEvolution(Request $request): JsonResponse
-    {
-        $filters = $this->filterService->extractFilters($request->all());
-        $data = $this->filterService->getMonthlyEvolution($request->user()->id, $filters);
-        return response()->json(['data' => $data]);
-    }
-
-    public function savingsRate(Request $request): JsonResponse
-    {
-        $filters = $this->filterService->extractFilters($request->all());
-        $totals = $this->filterService->getAggregations($request->user()->id, $filters);
-
-        $receita = $totals['receita'];
-        $despesa = $totals['despesa'];
-        $savings = $receita - $despesa;
-
-        // Evitar divisão por zero
-        $rate = $receita > 0 ? ($savings / $receita) * 100 : 0;
-
-        return response()->json([
-            'data' => [
-                'rate' => round($rate, 2),
-                'savings' => round($savings, 2),
-                'income' => $receita,
-                'expenses' => $despesa
-            ]
-        ]);
-    }
-
-    public function fixedVsVariable(Request $request): JsonResponse
-    {
-        $filters = $this->filterService->extractFilters($request->all());
-        $userId = $request->user()->id;
-
-        // Base query with filters
+        $userId = Auth::id();
         $query = Transaction::where('user_id', $userId)
-            ->where('type', 'despesa') // Analisar apenas despesas
-            ->whereNotIn('status', ['estornada', 'cancelada']);
+            ->with(['account', 'category', 'card']);
 
-        $query = $this->filterService->apply($query, $filters);
+        // Apply filters (same as TransactionController)
+        if ($request->filled('start_date')) {
+            $query->where('date', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $query->where('date', '<=', $request->end_date);
+        }
+        if ($request->filled('type') && $request->type !== 'all') {
+            $query->where('type', $request->type);
+        }
+        if ($request->filled('account_id')) {
+            $query->where('account_id', $request->account_id);
+        }
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+        if ($request->filled('payment_method')) {
+            $query->where('payment_method', $request->payment_method);
+        }
+        if ($request->filled('search')) {
+            $query->where('description', 'like', '%' . $request->search . '%');
+        }
 
-        $data = $query->selectRaw("
-                CASE 
-                    WHEN recurring_transaction_id IS NOT NULL THEN 'Fixo' 
-                    ELSE 'Variável' 
-                END as type, 
-                SUM(value) as total
-            ")
-            ->groupBy('type')
-            ->get();
+        $transactions = $query->orderBy('date', 'desc')->get();
 
-        $formatted = $data->map(function ($item) {
-            return [
-                'name' => $item->type,
-                'total' => (float) $item->total,
-                'color' => $item->type === 'Fixo' ? '#3B82F6' : '#F59E0B', // Azul (Fixo), Laranja (Variável)
-            ];
-        });
+        // Calculate totals (transfers don't count)
+        $totals = $this->calculateTotals($transactions);
 
-        return response()->json(['data' => $formatted]);
+        // Period label
+        $periodLabel = $this->getPeriodLabel($request);
+
+        return [
+            'transactions' => $transactions,
+            'totals' => $totals,
+            'period_label' => $periodLabel,
+            'generated_at' => Carbon::now()->format('d/m/Y H:i'),
+        ];
     }
 
     /**
-     * Evolução do Uso de Crédito (Total Faturas vs Limite)
+     * Get summary data for export.
      */
-    public function creditLimitEvolution(Request $request): JsonResponse
+    private function getSummaryData(Request $request): array
     {
-        $userId = $request->user()->id;
-        // Obter limite total atual de cartões ativos
-        $totalLimit = Card::where('user_id', $userId)
-            ->where('status', 'ativo')
-            ->sum('credit_limit');
+        $userId = Auth::id();
+        $query = Transaction::where('user_id', $userId);
 
-        // Histórico de Faturas Agrupado por Mês
-        $invoices = CardInvoice::whereHas('card', function ($q) use ($userId) {
-            $q->where('user_id', $userId);
-        })
-            ->selectRaw("reference_month, SUM(total_value) as total_used")
-            ->groupBy('reference_month')
-            ->orderBy('reference_month')
-            ->get()
-            ->map(function ($inv) use ($totalLimit) {
+        // Apply date filters
+        if ($request->filled('start_date')) {
+            $query->where('date', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $query->where('date', '<=', $request->end_date);
+        }
+
+        $transactions = $query->get();
+        $totals = $this->calculateTotals($transactions);
+
+        // Expenses by category (ordered by value desc, with percentage)
+        $expensesByCategory = $transactions
+            ->where('type', 'despesa')
+            ->groupBy('category_id')
+            ->map(function ($group) use ($totals) {
+                $value = $group->sum('value');
+                $percentage = $totals['expense'] > 0 ? ($value / $totals['expense']) * 100 : 0;
                 return [
-                    'month' => $inv->reference_month, // YYYY-MM
-                    'used' => (float) $inv->total_used,
-                    'limit' => (float) $totalLimit // Linha de referência
+                    'category' => $group->first()->category?->name ?? 'Sem categoria',
+                    'value' => $value,
+                    'percentage' => $percentage,
                 ];
-            });
+            })
+            ->sortByDesc('value')
+            ->values();
 
-        return response()->json(['data' => $invoices]);
-    }
-
-    /**
-     * Comprometimento Futuro (Parcelas a vencer)
-     */
-    public function futureCommitment(Request $request): JsonResponse
-    {
-        $userId = $request->user()->id;
-        $now = Carbon::now();
-
-        $commitments = \App\Models\CardInstallment::whereHas('transaction', function ($q) use ($userId) {
-            $q->where('user_id', $userId);
-        })
-            ->whereDate('due_date', '>', $now)
-            ->whereNotIn('status', ['estornada', 'paga'])
-            ->selectRaw("strftime('%Y-%m', due_date) as month, SUM(value) as total")
-            ->groupBy('month')
-            ->orderBy('month')
-            ->limit(12) // Próximos 12 meses
-            ->get();
-
-        return response()->json(['data' => $commitments]);
-    }
-
-    /**
-     * Top Cartões por Uso (Soma das Faturas)
-     */
-    public function topCards(Request $request): JsonResponse
-    {
-        $userId = $request->user()->id;
-
-        $topCards = CardInvoice::whereHas('card', function ($q) use ($userId) {
-            $q->where('user_id', $userId);
-        })
-            ->join('cards', 'card_invoices.card_id', '=', 'cards.id')
-            ->selectRaw("cards.id, cards.name, cards.color, SUM(card_invoices.total_value) as total")
-            ->groupBy('cards.id', 'cards.name', 'cards.color')
-            ->orderByDesc('total')
-            ->take(5)
-            ->get()
-            ->map(function ($item) {
+        // Income by category (ordered by value desc, with percentage)
+        $incomeByCategory = $transactions
+            ->where('type', 'receita')
+            ->groupBy('category_id')
+            ->map(function ($group) use ($totals) {
+                $value = $group->sum('value');
+                $percentage = $totals['income'] > 0 ? ($value / $totals['income']) * 100 : 0;
                 return [
-                    'name' => $item->name,
-                    'total' => (float) $item->total,
-                    'color' => $item->color ?? '#6B7280'
+                    'category' => $group->first()->category?->name ?? 'Sem categoria',
+                    'value' => $value,
+                    'percentage' => $percentage,
                 ];
-            });
+            })
+            ->sortByDesc('value')
+            ->values();
 
-        return response()->json(['data' => $topCards]);
+        return [
+            'totals' => $totals,
+            'expenses_by_category' => $expensesByCategory,
+            'income_by_category' => $incomeByCategory,
+            'period_label' => $this->getPeriodLabel($request),
+            'generated_at' => Carbon::now()->format('d/m/Y H:i'),
+        ];
+    }
+
+    /**
+     * Calculate totals.
+     * IMPORTANT: Transfers (transferencia) don't count in income or expense.
+     */
+    private function calculateTotals($transactions): array
+    {
+        $income = $transactions->where('type', 'receita')->sum('value');
+        $expense = $transactions->where('type', 'despesa')->sum('value');
+        // Transfers are excluded from balance calculation
+
+        return [
+            'income' => $income,
+            'expense' => $expense,
+            'balance' => $income - $expense,
+        ];
+    }
+
+    /**
+     * Get period label from request.
+     */
+    private function getPeriodLabel(Request $request): string
+    {
+        $start = $request->filled('start_date')
+            ? Carbon::parse($request->start_date)->format('d/m/Y')
+            : 'Início';
+        $end = $request->filled('end_date')
+            ? Carbon::parse($request->end_date)->format('d/m/Y')
+            : 'Hoje';
+
+        return "{$start} a {$end}";
+    }
+
+    /**
+     * Format payment method for display.
+     */
+    private function formatPaymentMethod(?string $method): string
+    {
+        $methods = [
+            'pix' => 'PIX',
+            'debit' => 'Débito',
+            'credit' => 'Crédito',
+            'transfer' => 'Transferência',
+            'boleto' => 'Boleto',
+            'dinheiro' => 'Dinheiro',
+        ];
+
+        return $methods[$method] ?? ($method ?? '-');
     }
 }

@@ -124,6 +124,11 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 
+    // Export Routes (PDF / CSV)
+    Route::get('reports/transactions/pdf', [ReportController::class, 'transactionsPdf']);
+    Route::get('reports/transactions/csv', [ReportController::class, 'transactionsCsv']);
+    Route::get('reports/summary/pdf', [ReportController::class, 'summaryPdf']);
+
     // Import OFX
     Route::post('import/parse', [ImportController::class, 'parse']);
     Route::post('import/confirm', [ImportController::class, 'confirm']);
