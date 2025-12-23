@@ -290,7 +290,37 @@
                     </p>
                 </div>
 
-                <div v-if="!generalBudget && categoryBudgets.length === 0" class="text-center py-8 text-gray-500">
+                <!-- Annual Budget Section -->
+                <div v-if="annualBudget" class="mt-4 pt-4 border-t dark:border-gray-700">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Orçamento Anual</p>
+                    <RouterLink to="/budgets" class="block p-4 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 hover:from-purple-100 hover:to-indigo-100 dark:hover:from-purple-900/30 dark:hover:to-indigo-900/30 transition-colors">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-white text-lg">
+                                    📅
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ annualBudget.name }}</p>
+                                    <p class="text-xs text-gray-500">
+                                        {{ formatCurrency(annualBudgetSpent) }} de {{ formatCurrency(annualBudget.limit_value) }}
+                                    </p>
+                                </div>
+                            </div>
+                            <span :class="getGeneralBudgetStatusClass(annualBudgetStatus)">
+                                {{ annualBudgetStatus === 'exceeded' ? 'Estourado' : annualBudgetStatus === 'warning' ? 'Atenção' : 'OK' }}
+                            </span>
+                        </div>
+                        <div class="h-2 bg-white/50 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div 
+                                class="h-full transition-all duration-300"
+                                :class="annualBudgetStatus === 'exceeded' ? 'bg-red-500' : annualBudgetStatus === 'warning' ? 'bg-yellow-500' : 'bg-green-500'"
+                                :style="{ width: Math.min(annualBudgetPercentage, 100) + '%' }"
+                            ></div>
+                        </div>
+                    </RouterLink>
+                </div>
+
+                <div v-if="!generalBudget && !annualBudget && categoryBudgets.length === 0" class="text-center py-8 text-gray-500">
                     <RouterLink to="/budgets" class="text-primary-600 hover:underline">
                         Criar primeiro orçamento →
                     </RouterLink>
@@ -349,9 +379,10 @@ const loading = ref(false);
 
 // Budget data
 const generalBudget = ref(null);
+const annualBudget = ref(null);
 const categoryBudgets = ref([]);
 
-// General budget computed values
+// General budget computed values (monthly)
 const generalBudgetSpent = computed(() => {
     if (!generalBudget.value?.current_period) return 0;
     return parseFloat(generalBudget.value.current_period.spent) || 0;
@@ -370,6 +401,25 @@ const generalBudgetStatus = computed(() => {
     return 'ok';
 });
 
+// Annual budget computed values
+const annualBudgetSpent = computed(() => {
+    if (!annualBudget.value?.current_period) return 0;
+    return parseFloat(annualBudget.value.current_period.spent) || 0;
+});
+
+const annualBudgetPercentage = computed(() => {
+    if (!annualBudget.value) return 0;
+    const limit = parseFloat(annualBudget.value.limit_value) || 1;
+    return (annualBudgetSpent.value / limit) * 100;
+});
+
+const annualBudgetStatus = computed(() => {
+    const pct = annualBudgetPercentage.value;
+    if (pct >= 100) return 'exceeded';
+    if (pct >= 80) return 'warning';
+    return 'ok';
+});
+
 function getGeneralBudgetStatusClass(status) {
     const classes = {
         ok: 'text-xs px-2 py-1 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
@@ -381,19 +431,23 @@ function getGeneralBudgetStatusClass(status) {
 
 async function loadBudgetData() {
     try {
-        // Load general budgets
+        // Load general budgets (both monthly and annual)
         const generalResponse = await axios.get('/api/general-budgets-current');
-        const generalBudgets = generalResponse.data.data || [];
-        // Get first active monthly budget for display
-        generalBudget.value = generalBudgets.find(b => b.period_type === 'monthly' && b.status === 'active') 
-                          || generalBudgets.find(b => b.status === 'active')
-                          || generalBudgets[0] 
-                          || null;
+        const allGeneralBudgets = generalResponse.data.data || [];
+        console.log('General budgets loaded:', allGeneralBudgets);
+        
+        // Get monthly budget (active or paused)
+        generalBudget.value = allGeneralBudgets.find(b => b.period_type === 'monthly') || null;
+        
+        // Get annual budget (will be shown separately)
+        annualBudget.value = allGeneralBudgets.find(b => b.period_type === 'annual') || null;
 
         // Load category budgets for current period
         const period = `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}`;
+        console.log('Loading category budgets for period:', period);
         const categoryResponse = await axios.get('/api/budgets/summary', { params: { period } });
         categoryBudgets.value = categoryResponse.data.data || [];
+        console.log('Category budgets loaded:', categoryBudgets.value);
     } catch (e) {
         console.error('Error loading budget data:', e);
     }
