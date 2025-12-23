@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ImportController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\BackupController;
+use App\Http\Controllers\Api\FinancialInsightsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -119,6 +120,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('reports/budget-consumption', [ReportController::class, 'budgetConsumption']);
     Route::get('reports/budget-alerts', [ReportController::class, 'budgetAlerts']);
     Route::get('reports/goals-progress', [ReportController::class, 'goalsProgress']);
+
+    // Financial Insights (Read-only)
+    Route::get('insights/summary', [FinancialInsightsController::class, 'summary']);
+    Route::get('insights/trends', [FinancialInsightsController::class, 'trends']);
+    Route::get('insights/score', [FinancialInsightsController::class, 'score']);
 
     // Audit Logs
     Route::get('audit-logs', function (\Illuminate\Http\Request $request) {

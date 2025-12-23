@@ -18,6 +18,7 @@ import Categories from '@/pages/Categories/Index.vue';
 import Recurrences from '@/pages/Recurrences/Index.vue';
 import Budgets from '@/pages/Budgets/Index.vue';
 import Goals from '@/pages/Goals/Index.vue';
+import Insights from '@/pages/Insights.vue';
 import Charts from '@/pages/Charts/Index.vue';
 import Calendar from '@/pages/Calendar/Index.vue';
 import Import from '@/pages/Import/Index.vue';
@@ -149,6 +150,14 @@ const routes = [
         path: '/goals',
         name: 'goals',
         component: Goals,
+        meta: { auth: true },
+    },
+
+    // Financial Insights
+    {
+        path: '/insights',
+        name: 'insights',
+        component: Insights,
         meta: { auth: true },
     },
 
