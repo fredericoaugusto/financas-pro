@@ -57,6 +57,7 @@ class TransactionService
                 'affects_balance' => false, // Compras no crédito não afetam saldo diretamente
                 'status' => 'confirmada',
                 'notes' => $data['notes'] ?? null,
+                'recurring_transaction_id' => $data['recurring_transaction_id'] ?? null,
             ]);
 
             // Criar as parcelas (entidades separadas vinculadas às faturas)
