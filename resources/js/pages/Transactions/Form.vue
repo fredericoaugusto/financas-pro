@@ -332,8 +332,8 @@
                                 Lançando a partir da {{ form.current_installment }}ª parcela ({{ remainingInstallmentsCount }} parcelas restantes)
                             </p>
                             <p v-if="remainingInstallmentsCount > 1" class="text-sm text-gray-500 mt-1">
-                                Primeira parcela na fatura de {{ invoicePreviewMonth }}. 
-                                Última parcela na fatura de {{ lastInstallmentMonth }}.
+                                Primeira parcela na fatura que vence em {{ invoicePreviewMonth }}. 
+                                Última parcela na fatura que vence em {{ lastInstallmentMonth }}.
                             </p>
                         </div>
                     </div>
@@ -428,7 +428,7 @@ const selectedCardName = computed(() => {
     return selectedCard.value?.name || 'Cartão não selecionado';
 });
 
-// Calculate which invoice the purchase will be posted to
+// Calculate which invoice the purchase will be posted to (by DUE date, not closing date)
 // When current_installment > 1, it means we're starting from a later installment
 // so we should use the current open invoice instead of calculating from purchase date
 const invoicePreviewMonth = computed(() => {
@@ -445,13 +445,17 @@ const invoicePreviewMonth = computed(() => {
     let invoiceMonth = referenceDate.getMonth();
     let invoiceYear = referenceDate.getFullYear();
     
-    // If reference date is ON or AFTER closing day, goes to next month's invoice
+    // If reference date is ON or AFTER closing day, the purchase goes to next month's invoice
+    // The invoice that closes in month X typically is due (vence) in month X+1
+    // So we add 1 to get the due month
     if (referenceDate.getDate() >= closingDay) {
         invoiceMonth++;
-        if (invoiceMonth > 11) {
-            invoiceMonth = 0;
-            invoiceYear++;
-        }
+    }
+    
+    // Normalize months and years
+    if (invoiceMonth > 11) {
+        invoiceYear += Math.floor(invoiceMonth / 12);
+        invoiceMonth = invoiceMonth % 12;
     }
     
     const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
@@ -465,9 +469,9 @@ const invoicePreviewText = computed(() => {
     const remainingInstallments = (form.installments || 1) - (form.current_installment || 1) + 1;
     
     if (remainingInstallments > 1) {
-        return `Esta compra será lançada a partir da fatura de ${invoicePreviewMonth.value}.`;
+        return `Esta compra será lançada a partir da fatura que vence em ${invoicePreviewMonth.value}.`;
     }
-    return `Esta compra será lançada na fatura de ${invoicePreviewMonth.value}.`;
+    return `Esta compra será lançada na fatura que vence em ${invoicePreviewMonth.value}.`;
 });
 
 const lastInstallmentMonth = computed(() => {
@@ -484,13 +488,9 @@ const lastInstallmentMonth = computed(() => {
     let invoiceMonth = referenceDate.getMonth();
     let invoiceYear = referenceDate.getFullYear();
     
-    // If reference date is ON or AFTER closing day, goes to next month's invoice
+    // If reference date is ON or AFTER closing day, the purchase goes to next month's invoice
     if (referenceDate.getDate() >= closingDay) {
         invoiceMonth++;
-        if (invoiceMonth > 11) {
-            invoiceMonth = 0;
-            invoiceYear++;
-        }
     }
     
     // Add remaining installments (minus 1 because first is already counted)
