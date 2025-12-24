@@ -824,22 +824,24 @@ function getDaysUntilDue(dateStr) {
     const utcDue = Date.UTC(dueYear, dueMonth - 1, dueDay);
     
     const diffMs = utcDue - utcToday;
-    return Math.round(diffMs / (1000 * 60 * 60 * 24));
+    // Exclui dia de início, inclui dia final
+    return Math.round(diffMs / (1000 * 60 * 60 * 24)) - 1;
 }
 
 function getDueWarningClass(days) {
     if (days === null) return '';
-    if (days < 0) return 'text-red-600 font-bold'; // Vencida
-    if (days <= 3) return 'text-red-600 font-bold animate-pulse'; // Crítico
-    if (days <= 7) return 'text-yellow-600 font-bold'; // Alerta
+    if (days < -1) return 'text-red-600 font-bold'; // Vencida
+    if (days === -1) return 'text-red-600 font-bold animate-pulse'; // Vence hoje!
+    if (days <= 2) return 'text-red-600 font-bold animate-pulse'; // Crítico (até 3 dias)
+    if (days <= 6) return 'text-yellow-600 font-bold'; // Alerta (até 7 dias)
     return 'text-primary-600 font-medium'; // Normal
 }
 
 function getDueWarningText(days) {
     if (days === null) return '';
-    if (days < 0) return `Venceu há ${Math.abs(days)} dias`;
-    if (days === 0) return 'Vence hoje!';
-    if (days === 1) return 'Vence amanhã';
+    if (days < -1) return `Venceu há ${Math.abs(days + 1)} dias`;
+    if (days === -1) return 'Vence hoje!';
+    if (days === 0) return 'Vence amanhã';
     return `Vence em ${days} dias`;
 }
 
