@@ -744,6 +744,10 @@ async function loadDashboardData() {
         await accountsStore.fetchAccounts();
         stats.value.totalBalance = accountsStore.totalBalance;
 
+        // Clear any existing filters before loading transactions for dashboard
+        // (filters may persist from previous navigation to Transactions page)
+        transactionsStore.clearFilters();
+        
         // Load transactions
         await transactionsStore.fetchTransactions();
         
