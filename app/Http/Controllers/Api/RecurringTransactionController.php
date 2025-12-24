@@ -87,7 +87,9 @@ class RecurringTransactionController extends Controller
         return response()->json([
             'data' => $recurring->load([
                 'transactions' => function ($q) {
-                    $q->latest()->limit(5); // Mostrar últimas 5 gerações
+                    $q->select('id', 'recurring_transaction_id', 'date', 'value', 'type', 'description')
+                        ->orderBy('date', 'desc')
+                        ->limit(50); // Limit for performance but show more history
                 },
                 'category',
                 'account',

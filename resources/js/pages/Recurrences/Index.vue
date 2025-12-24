@@ -67,7 +67,8 @@
             <div 
                 v-for="recurring in filteredRecurrings" 
                 :key="recurring.id"
-                class="card hover:shadow-lg transition-shadow"
+                class="card hover:shadow-lg transition-shadow cursor-pointer"
+                @click="openDetailModal(recurring)"
             >
                 <div class="flex items-center gap-4">
                     <!-- Icon -->
@@ -106,11 +107,15 @@
                             {{ recurring.category?.name || 'Sem categoria' }} · 
                             {{ getFrequencyLabel(recurring) }}
                         </p>
-                        <p class="text-xs text-gray-400 mt-0.5">
-                            <span class="font-medium">Próxima:</span> {{ formatDate(recurring.next_occurrence) }}
-                            <template v-if="recurring.end_date">
-                                · <span class="font-medium">Até:</span> {{ formatDate(recurring.end_date) }}
-                            </template>
+                        <p v-if="recurring.status === 'ativa'" class="text-xs text-primary-600 dark:text-primary-400 mt-0.5 font-medium">
+                            Próxima cobrança em {{ formatDate(recurring.next_occurrence) }}
+                        </p>
+                        <p v-else-if="recurring.status === 'pausada'" class="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">
+                            Pausada desde {{ formatDate(recurring.updated_at) }}
+                        </p>
+                        <p v-else class="text-xs text-gray-400 mt-0.5">
+                            Encerrada
+                            <template v-if="recurring.end_date">em {{ formatDate(recurring.end_date) }}</template>
                         </p>
                     </div>
 
@@ -125,7 +130,7 @@
                     </div>
 
                     <!-- Actions -->
-                    <div class="flex items-center gap-1 flex-shrink-0">
+                    <div class="flex items-center gap-1 flex-shrink-0" @click.stop>
                         <button 
                             v-if="recurring.status === 'ativa'"
                             @click="openGenerateConfirm(recurring)"
@@ -323,7 +328,7 @@
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
                                 <select v-model="form.category_id" class="input w-full">
                                     <option :value="null">Selecione uma categoria...</option>
-                                    <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                                    <option v-for="cat in filteredCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
                                 </select>
                             </div>
 
@@ -424,6 +429,213 @@
                 </div>
             </div>
         </Teleport>
+
+        <!-- Detail Modal -->
+        <Teleport to="body">
+            <div v-if="showDetailModal && selectedRecurring" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="closeDetailModal">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl animate-slide-up">
+                    <!-- Modal Header -->
+                    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <div class="flex items-center gap-3">
+                            <div :class="[
+                                'w-10 h-10 rounded-xl flex items-center justify-center',
+                                selectedRecurring.type === 'receita' 
+                                    ? 'bg-green-100 dark:bg-green-900/30' 
+                                    : 'bg-red-100 dark:bg-red-900/30'
+                            ]">
+                                <svg :class="[
+                                    'w-5 h-5',
+                                    selectedRecurring.type === 'receita' ? 'text-green-600' : 'text-red-600'
+                                ]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path v-if="selectedRecurring.type === 'receita'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                                    <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ selectedRecurring.description }}</h2>
+                                <span :class="getStatusBadgeClass(selectedRecurring.status)">{{ getStatusLabel(selectedRecurring.status) }}</span>
+                            </div>
+                        </div>
+                        <button @click="closeDetailModal" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="px-6 py-5 overflow-y-auto max-h-[calc(90vh-200px)]">
+                        <!-- Loading -->
+                        <div v-if="detailLoading" class="flex justify-center py-8">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                        </div>
+
+                        <div v-else class="space-y-6">
+                            <!-- Value & Next Occurrence Highlight -->
+                            <div class="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700/50 dark:to-gray-700/30 rounded-xl p-4">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">Valor</p>
+                                        <p :class="[
+                                            'text-2xl font-bold',
+                                            selectedRecurring.type === 'receita' ? 'text-green-600' : 'text-red-600'
+                                        ]">
+                                            {{ selectedRecurring.type === 'receita' ? '+' : '-' }}{{ formatCurrency(selectedRecurring.value) }}
+                                        </p>
+                                    </div>
+                                    <div v-if="selectedRecurring.status === 'ativa'" class="text-right">
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">Próxima cobrança</p>
+                                        <p class="text-lg font-semibold text-primary-600 dark:text-primary-400">
+                                            {{ formatDate(selectedRecurring.next_occurrence) }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <!-- Microcopy -->
+                                <p class="mt-3 text-sm text-gray-600 dark:text-gray-300 bg-white/50 dark:bg-gray-800/50 rounded-lg px-3 py-2">
+                                    <span class="font-medium">{{ getFrequencyLabel(selectedRecurring) }}</span>
+                                    <span v-if="selectedRecurring.status === 'ativa'"> — {{ getNextOccurrenceText(selectedRecurring) }}</span>
+                                </p>
+                            </div>
+
+                            <!-- Details Grid -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Tipo</p>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ selectedRecurring.type === 'receita' ? 'Receita' : 'Despesa' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Categoria</p>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ selectedRecurring.category?.name || 'Sem categoria' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Origem do Pagamento</p>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ getPaymentSourceText(selectedRecurring) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Frequência</p>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ getFrequencyLabel(selectedRecurring) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Data de Início</p>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ formatDate(selectedRecurring.start_date) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Data de Término</p>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ selectedRecurring.end_date ? formatDate(selectedRecurring.end_date) : 'Indefinida' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Última Cobrança</p>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ selectedRecurring.last_generated_at ? formatDate(selectedRecurring.last_generated_at) : 'Nunca gerada' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Criada em</p>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ formatDate(selectedRecurring.created_at) }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Notes -->
+                            <div v-if="selectedRecurring.notes">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Observações</p>
+                                <p class="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">{{ selectedRecurring.notes }}</p>
+                            </div>
+
+                            <!-- Charge History -->
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    Histórico de Cobranças
+                                </h3>
+                                <div v-if="selectedRecurring.transactions && selectedRecurring.transactions.length > 0" class="space-y-2 max-h-48 overflow-y-auto">
+                                    <RouterLink 
+                                        v-for="tx in selectedRecurring.transactions" 
+                                        :key="tx.id"
+                                        :to="`/transactions/${tx.id}/edit`"
+                                        class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    >
+                                        <div class="flex items-center gap-3">
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <span class="text-sm text-gray-700 dark:text-gray-300">{{ formatDate(tx.date) }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span :class="[
+                                                'text-sm font-medium',
+                                                tx.type === 'receita' ? 'text-green-600' : 'text-red-600'
+                                            ]">{{ formatCurrency(tx.value) }}</span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </div>
+                                    </RouterLink>
+                                </div>
+                                <div v-else class="text-center py-6 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                                    <svg class="w-8 h-8 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    <p class="text-sm text-gray-500">Nenhuma cobrança gerada ainda</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Footer with Actions -->
+                    <div class="flex flex-wrap gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                        <button 
+                            v-if="selectedRecurring.status === 'ativa'"
+                            @click="openGenerateConfirm(selectedRecurring); closeDetailModal()"
+                            class="flex-1 min-w-[120px] btn-secondary text-blue-600 border-blue-200 hover:bg-blue-50"
+                        >
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Gerar Agora
+                        </button>
+                        <button 
+                            v-if="selectedRecurring.status === 'ativa'"
+                            @click="openPauseConfirm(selectedRecurring); closeDetailModal()"
+                            class="flex-1 min-w-[120px] btn-secondary text-yellow-600 border-yellow-200 hover:bg-yellow-50"
+                        >
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Pausar
+                        </button>
+                        <button 
+                            v-if="selectedRecurring.status === 'pausada'"
+                            @click="resumeRecurring(selectedRecurring); closeDetailModal()"
+                            class="flex-1 min-w-[120px] btn-secondary text-green-600 border-green-200 hover:bg-green-50"
+                        >
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            </svg>
+                            Retomar
+                        </button>
+                        <button 
+                            @click="openEditModal(selectedRecurring); closeDetailModal()"
+                            class="flex-1 min-w-[120px] btn-secondary"
+                        >
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Editar
+                        </button>
+                        <button 
+                            v-if="selectedRecurring.status !== 'encerrada'"
+                            @click="openEndConfirm(selectedRecurring); closeDetailModal()"
+                            class="flex-1 min-w-[120px] btn-secondary text-red-600 border-red-200 hover:bg-red-50"
+                        >
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Encerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
@@ -457,6 +669,11 @@ const confirmButtonText = ref('');
 const confirmLoading = ref(false);
 const confirmRecurring = ref(null);
 
+// Detail modal state
+const showDetailModal = ref(false);
+const selectedRecurring = ref(null);
+const detailLoading = ref(false);
+
 const tabs = [
     { label: 'Todas', value: 'all' },
     { label: 'Ativas', value: 'ativa' },
@@ -486,6 +703,11 @@ const cards = computed(() => cardsStore.cards.filter(c => !c.archived_at));
 const categories = computed(() => categoriesStore.categories);
 const recurrings = computed(() => recurringStore.recurrings);
 
+// Filter categories by type (despesa = despesa categories, receita = receita categories)
+const filteredCategories = computed(() => {
+    return categories.value.filter(cat => cat.type === form.value.type);
+});
+
 const filteredRecurrings = computed(() => {
     if (activeTab.value === 'all') return recurrings.value;
     return recurrings.value.filter(r => r.status === activeTab.value);
@@ -508,6 +730,11 @@ watch(() => form.value.payment_source, (newVal) => {
     } else {
         form.value.account_id = null;
     }
+});
+
+// Clear category when type changes (categories are filtered by type)
+watch(() => form.value.type, () => {
+    form.value.category_id = null;
 });
 
 function getTabCount(status) {
@@ -695,6 +922,44 @@ async function executeConfirmAction() {
 
 async function resumeRecurring(recurring) {
     await recurringStore.resumeRecurring(recurring.id);
+}
+
+// Detail modal functions
+async function openDetailModal(recurring) {
+    selectedRecurring.value = recurring;
+    showDetailModal.value = true;
+    
+    // Fetch full details with transactions if needed
+    detailLoading.value = true;
+    try {
+        const details = await recurringStore.fetchRecurringDetails(recurring.id);
+        if (details) {
+            selectedRecurring.value = details;
+        }
+    } finally {
+        detailLoading.value = false;
+    }
+}
+
+function closeDetailModal() {
+    showDetailModal.value = false;
+    selectedRecurring.value = null;
+}
+
+function getNextOccurrenceText(recurring) {
+    if (!recurring.next_occurrence) return '';
+    const formatted = formatDate(recurring.next_occurrence);
+    return `Próxima cobrança em ${formatted}`;
+}
+
+function getPaymentSourceText(recurring) {
+    if (recurring.card_id && recurring.card) {
+        return `Cartão: ${recurring.card.name}`;
+    }
+    if (recurring.account_id && recurring.account) {
+        return `Conta: ${recurring.account.name}`;
+    }
+    return 'Não definida';
 }
 
 onMounted(async () => {

@@ -146,5 +146,15 @@ export const useRecurringStore = defineStore('recurring', {
                 throw error;
             }
         },
+
+        async fetchRecurringDetails(id) {
+            try {
+                const response = await axios.get(`/api/recurring-transactions/${id}`);
+                return response.data.data;
+            } catch (error) {
+                console.error('Erro ao carregar detalhes da recorrência:', error);
+                return null;
+            }
+        },
     },
 });
