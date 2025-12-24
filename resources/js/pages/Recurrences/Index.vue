@@ -433,9 +433,9 @@
         <!-- Detail Modal -->
         <Teleport to="body">
             <div v-if="showDetailModal && selectedRecurring" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="closeDetailModal">
-                <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl animate-slide-up">
-                    <!-- Modal Header -->
-                    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-2xl animate-slide-up flex flex-col">
+                    <!-- Modal Header (fixed) -->
+                    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                         <div class="flex items-center gap-3">
                             <div :class="[
                                 'w-10 h-10 rounded-xl flex items-center justify-center',
@@ -463,8 +463,8 @@
                         </button>
                     </div>
 
-                    <!-- Modal Body -->
-                    <div class="px-6 py-5 overflow-y-auto max-h-[calc(90vh-200px)]">
+                    <!-- Modal Body (scrollable) -->
+                    <div class="px-6 py-5 overflow-y-auto flex-1 min-h-0">
                         <!-- Loading -->
                         <div v-if="detailLoading" class="flex justify-center py-8">
                             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
@@ -581,8 +581,8 @@
                         </div>
                     </div>
 
-                    <!-- Generation Info Section -->
-                    <div v-if="generationInfo" class="px-6 py-3 bg-blue-50 dark:bg-blue-900/20 text-sm border-t border-gray-200 dark:border-gray-700">
+                    <!-- Generation Info Section (fixed) -->
+                    <div v-if="generationInfo" class="px-6 py-3 bg-blue-50 dark:bg-blue-900/20 text-sm border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-gray-600 dark:text-gray-400">
                             <div v-if="generationInfo.last_automatic">
                                 <span class="text-xs text-gray-500">Última automática:</span>
@@ -599,8 +599,8 @@
                         </div>
                     </div>
 
-                    <!-- Modal Footer with Actions -->
-                    <div class="flex flex-wrap gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <!-- Modal Footer with Actions (fixed) -->
+                    <div class="flex flex-wrap gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
                         <!-- Gerar Agora - 3 states: normal (blue), alert (yellow), blocked (disabled) -->
                         <button 
                             v-if="buttonState !== 'blocked'"
