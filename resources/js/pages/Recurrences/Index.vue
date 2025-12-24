@@ -551,7 +551,7 @@
                                     <RouterLink 
                                         v-for="tx in selectedRecurring.transactions" 
                                         :key="tx.id"
-                                        :to="`/transactions/${tx.id}/edit`"
+                                        :to="{ path: '/transactions', query: { showDetail: tx.id } }"
                                         class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                     >
                                         <div class="flex items-center gap-3">

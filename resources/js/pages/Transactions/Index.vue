@@ -835,6 +835,31 @@ onMounted(async () => {
     ]);
     
     // Initial fetch is handled by useFilters onMounted
+    
+    // Check if we should auto-open a transaction detail modal
+    const showDetailId = route.query.showDetail;
+    if (showDetailId) {
+        // Wait a bit for transactions to load, then find and open the transaction
+        setTimeout(async () => {
+            // Try to find the transaction in the loaded list
+            let transaction = transactionsStore.transactions.find(t => t.id === parseInt(showDetailId));
+            if (!transaction) {
+                // If not found in list, fetch it directly
+                try {
+                    const response = await axios.get(`/api/transactions/${showDetailId}`);
+                    transaction = response.data.data;
+                } catch (e) {
+                    console.error('Could not load transaction details:', e);
+                    return;
+                }
+            }
+            if (transaction) {
+                openTransactionDetail(transaction);
+                // Clean up URL
+                router.replace({ query: { ...route.query, showDetail: undefined } });
+            }
+        }, 500);
+    }
 });
 
 // Helper for filtering by period
