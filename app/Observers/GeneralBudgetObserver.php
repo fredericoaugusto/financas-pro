@@ -4,15 +4,19 @@ namespace App\Observers;
 
 use App\Models\GeneralBudget;
 use App\Models\Transaction;
-use App\Services\NotificationService;
+use App\Services\GeneralBudgetService;
 
+/**
+ * Observer para verificar orçamentos gerais quando transações são criadas/atualizadas.
+ * 
+ * NOTA: Este observer usa o novo schema de general_budgets com periods.
+ * Os alertas são gerenciados através de GeneralBudgetPeriod, não diretamente no budget.
+ */
 class GeneralBudgetObserver
 {
-    private NotificationService $notificationService;
-
-    public function __construct(NotificationService $notificationService)
-    {
-        $this->notificationService = $notificationService;
+    public function __construct(
+        private GeneralBudgetService $budgetService
+    ) {
     }
 
     /**
@@ -20,62 +24,31 @@ class GeneralBudgetObserver
      */
     public function checkBudgets(Transaction $transaction): void
     {
+        // Only check for expenses
         if ($transaction->type !== 'despesa') {
             return;
         }
 
         $userId = $transaction->user_id;
-        $transactionDate = $transaction->date;
-        $month = (int) date('m', strtotime($transactionDate));
-        $year = (int) date('Y', strtotime($transactionDate));
 
-        // Check monthly budget
+        // Check monthly budget (active status only)
         $monthlyBudget = GeneralBudget::where('user_id', $userId)
-            ->where('type', 'mensal')
-            ->where('month', $month)
-            ->where('year', $year)
-            ->where('is_active', true)
+            ->where('period_type', 'monthly')
+            ->where('status', 'active')
             ->first();
 
         if ($monthlyBudget) {
-            $this->checkThreshold($monthlyBudget);
+            $this->budgetService->recalculateCurrentPeriod($monthlyBudget);
         }
 
-        // Check annual budget
+        // Check annual budget (active status only)
         $annualBudget = GeneralBudget::where('user_id', $userId)
-            ->where('type', 'anual')
-            ->where('year', $year)
-            ->where('is_active', true)
+            ->where('period_type', 'yearly')
+            ->where('status', 'active')
             ->first();
 
         if ($annualBudget) {
-            $this->checkThreshold($annualBudget);
-        }
-    }
-
-    private function checkThreshold(GeneralBudget $budget): void
-    {
-        $percentage = $budget->percentage;
-
-        // 100% threshold
-        if ($percentage >= 100 && !$budget->alert_100_sent) {
-            $this->notificationService->budgetExceeded(
-                $budget->user_id,
-                $budget->name,
-                $budget->amount,
-                $budget->spent
-            );
-            $budget->update(['alert_100_sent' => true]);
-        }
-        // 80% threshold
-        elseif ($percentage >= 80 && !$budget->alert_80_sent) {
-            $this->notificationService->budgetWarning(
-                $budget->user_id,
-                $budget->name,
-                $budget->amount,
-                $budget->spent
-            );
-            $budget->update(['alert_80_sent' => true]);
+            $this->budgetService->recalculateCurrentPeriod($annualBudget);
         }
     }
 }

@@ -65,11 +65,13 @@ class BudgetNotificationObserver
         $month = $date->month;
         $year = $date->year;
 
+        // Construir reference_month no formato YYYY-MM
+        $referenceMonth = sprintf('%04d-%02d', $year, $month);
+
         // Find budget for this category and month
         $budget = Budget::where('user_id', $userId)
             ->where('category_id', $categoryId)
-            ->where('month', $month)
-            ->where('year', $year)
+            ->where('reference_month', $referenceMonth)
             ->first();
 
         if (!$budget) {
@@ -84,7 +86,7 @@ class BudgetNotificationObserver
             ->whereYear('date', $year)
             ->sum('value');
 
-        $percentage = ($budget->amount > 0) ? ($totalSpent / $budget->amount) * 100 : 0;
+        $percentage = ($budget->limit_value > 0) ? ($totalSpent / $budget->limit_value) * 100 : 0;
         $categoryName = $transaction->category?->name ?? 'Categoria';
         $monthName = $date->translatedFormat('F');
 
@@ -98,7 +100,7 @@ class BudgetNotificationObserver
                 $month,
                 'Orçamento estourado',
                 "Orçamento de {$categoryName} estourado em {$monthName}.",
-                ['category_id' => $categoryId, 'percentage' => round($percentage), 'spent' => $totalSpent, 'limit' => $budget->amount]
+                ['category_id' => $categoryId, 'percentage' => round($percentage), 'spent' => $totalSpent, 'limit' => $budget->limit_value]
             );
         } elseif ($percentage >= 80) {
             $this->notifyIfNotAlreadySent(
@@ -109,7 +111,7 @@ class BudgetNotificationObserver
                 $month,
                 'Orçamento em risco',
                 "Atenção: você já utilizou " . round($percentage) . "% do orçamento de {$categoryName} em {$monthName}.",
-                ['category_id' => $categoryId, 'percentage' => round($percentage), 'spent' => $totalSpent, 'limit' => $budget->amount]
+                ['category_id' => $categoryId, 'percentage' => round($percentage), 'spent' => $totalSpent, 'limit' => $budget->limit_value]
             );
         }
     }
