@@ -7,16 +7,15 @@ use Illuminate\Support\Facades\Log;
 
 /*
 |--------------------------------------------------------------------------
-| Database Management Routes (Protected)
+| Database Management Routes (Protected by Token)
 |--------------------------------------------------------------------------
 |
 | These routes allow running database migrations on environments without
-| console access (like Render free tier). Protected by authentication
-| and a secret token.
+| console access (like Render free tier). Protected by a secret token.
 |
 */
 
-Route::middleware(['auth:sanctum'])->prefix('db-admin')->group(function () {
+Route::prefix('db-admin')->group(function () {
 
     /**
      * Run pending migrations
