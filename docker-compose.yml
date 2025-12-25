@@ -3,6 +3,10 @@
 # =============================================================================
 # This file is for LOCAL development only.
 # In production (Render), use the Dockerfile directly.
+#
+# Usage:
+#   1. Copy .env.docker.example to .env.docker
+#   2. Run: docker-compose --env-file .env.docker up
 # =============================================================================
 
 services:
@@ -21,17 +25,14 @@ services:
       - DB_CONNECTION=pgsql
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_DATABASE=financa
-      - DB_USERNAME=financa
-      - DB_PASSWORD=financa123
+      - DB_DATABASE=${POSTGRES_DB:-financa_dev}
+      - DB_USERNAME=${POSTGRES_USER:-financa_dev}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:?Database password required}
       - LOG_CHANNEL=stderr
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      # Mount for hot-reload during development (optional)
-      # - ./app:/var/www/html/app
-      # - ./resources:/var/www/html/resources
       - ./storage/app:/var/www/html/storage/app
     networks:
       - financa-network
@@ -42,15 +43,15 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: financa
-      POSTGRES_USER: financa
-      POSTGRES_PASSWORD: financa123
+      POSTGRES_DB: ${POSTGRES_DB:-financa_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-financa_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U financa"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-financa_dev}"]
       interval: 5s
       timeout: 5s
       retries: 5
