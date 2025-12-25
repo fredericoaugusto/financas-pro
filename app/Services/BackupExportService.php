@@ -170,9 +170,9 @@ class BackupExportService
             ->map(fn($b) => [
                 'id' => $b->id,
                 'category_id' => $b->category_id,
-                'amount' => $b->amount,
-                'month' => $b->month,
-                'year' => $b->year,
+                'limit_value' => $b->limit_value,
+                'reference_month' => $b->reference_month,
+                'period_type' => $b->period_type,
                 'created_at' => $b->created_at?->toIso8601String(),
             ])
             ->toArray();
@@ -185,13 +185,13 @@ class BackupExportService
             ->map(fn($g) => [
                 'id' => $g->id,
                 'name' => $g->name,
-                'target_amount' => $g->target_amount,
-                'current_amount' => $g->current_amount,
-                'target_date' => $g->target_date,
-                'status' => $g->status,
-                'color' => $g->color,
+                'description' => $g->description,
                 'icon' => $g->icon,
-                'notes' => $g->notes,
+                'color' => $g->color,
+                'target_value' => $g->target_value,
+                'current_value' => $g->current_value,
+                'status' => $g->status,
+                'target_date' => $g->target_date,
                 'created_at' => $g->created_at?->toIso8601String(),
             ])
             ->toArray();

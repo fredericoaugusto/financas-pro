@@ -43,7 +43,7 @@ class CheckInvoicesDueSoon implements ShouldQueue
             }
 
             $cardName = $invoice->card->name ?? 'Cartão';
-            $amount = $invoice->amount ?? 0;
+            $amount = $invoice->total_value ?? 0;
 
             // Check if we already sent this notification for this invoice
             $alreadySent = Notification::where('user_id', $userId)

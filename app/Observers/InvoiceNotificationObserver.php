@@ -38,7 +38,7 @@ class InvoiceNotificationObserver
 
         $userId = $card->user_id;
         $cardName = $card->name;
-        $amount = $invoice->amount ?? 0;
+        $amount = $invoice->total_value ?? 0;
 
         // Check if we already sent this notification for this invoice
         $alreadySent = Notification::where('user_id', $userId)
