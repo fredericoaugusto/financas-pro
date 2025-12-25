@@ -1,0 +1,60 @@
+# =============================================================================
+# Render Blueprint Specification
+# https://render.com/docs/blueprint-spec
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Web Service - Laravel Application
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: financa-app
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    
+    # Environment variables
+    envVars:
+      - key: APP_NAME
+        value: "Finança Pessoal"
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_TIMEZONE
+        value: America/Sao_Paulo
+      - key: APP_LOCALE
+        value: pt_BR
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: error
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: APP_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: financa-db
+          property: connectionString
+      - key: DB_CONNECTION
+        value: pgsql
+
+    # Health check
+    healthCheckPath: /up
+
+    # Auto-deploy on push
+    autoDeploy: true
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+databases:
+  - name: financa-db
+    databaseName: financa
+    user: financa
+    plan: free # or starter, standard, etc.

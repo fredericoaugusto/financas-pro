@@ -1,0 +1,59 @@
+# =============================================================================
+# Docker Ignore File
+# =============================================================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Dependencies (will be installed in container)
+node_modules
+vendor
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE and editors
+.idea
+.vscode
+*.swp
+*.swo
+
+# Logs
+storage/logs/*
+!storage/logs/.gitkeep
+
+# Cache
+storage/framework/cache/*
+!storage/framework/cache/.gitkeep
+storage/framework/sessions/*
+!storage/framework/sessions/.gitkeep
+storage/framework/views/*
+!storage/framework/views/.gitkeep
+bootstrap/cache/*
+!bootstrap/cache/.gitkeep
+
+# Testing
+.phpunit.result.cache
+coverage
+tests
+
+# Build artifacts
+public/hot
+public/build
+
+# Docker files not needed in context
+docker-compose*.yml
+Dockerfile*
+
+# Documentation
+README.md
+CHANGELOG.md
+docs
+
+# Debug files
+debug_error.txt
+*.log

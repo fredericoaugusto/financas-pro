@@ -1,0 +1,65 @@
+# =============================================================================
+# Docker Compose for Local Development
+# =============================================================================
+# This file is for LOCAL development only.
+# In production (Render), use the Dockerfile directly.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Main Application (PHP + Nginx)
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=financa
+      - DB_USERNAME=financa
+      - DB_PASSWORD=financa123
+      - LOG_CHANNEL=stderr
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Mount for hot-reload during development (optional)
+      # - ./app:/var/www/html/app
+      # - ./resources:/var/www/html/resources
+      - ./storage/app:/var/www/html/storage/app
+    networks:
+      - financa-network
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database (for testing Postgres locally)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: financa
+      POSTGRES_USER: financa
+      POSTGRES_PASSWORD: financa123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U financa"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - financa-network
+
+networks:
+  financa-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
