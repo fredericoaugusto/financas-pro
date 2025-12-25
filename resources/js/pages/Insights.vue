@@ -36,7 +36,7 @@
                                 ℹ️
                             </span>
                             <div class="tooltip-content">
-                                <p class="font-semibold mb-2 text-gray-800 dark:text-gray-200">Como calculamos seu score?</p>
+                                <p class="font-bold mb-2 text-gray-900 dark:text-white">Como calculamos seu score?</p>
                                 <p class="mb-2">Seu score é composto por 5 fatores:</p>
                                 <ul class="list-disc pl-4 space-y-1">
                                     <li>Estabilidade dos gastos mensais</li>
@@ -79,8 +79,8 @@
                                 <span class="text-gray-500">📊 Estabilidade</span>
                                 <div class="relative group">
                                     <span class="cursor-help text-gray-400 hover:text-gray-500 text-xs">ℹ️</span>
-                                    <div class="tooltip-content-small">
-                                        <p class="font-semibold mb-1">Estabilidade Financeira</p>
+                                    <div class="tooltip-content-left">
+                                        <p class="font-bold mb-1 text-gray-900 dark:text-white">Estabilidade Financeira</p>
                                         <p>Mede o quanto seus gastos variam de um mês para outro. Quanto menor a variação, maior sua estabilidade financeira.</p>
                                         <p class="mt-1 text-gray-500">• Baixa variação → melhor previsibilidade</p>
                                         <p class="text-gray-500">• Alta variação → maior risco financeiro</p>
@@ -99,8 +99,8 @@
                                 <span class="text-gray-500">💰 Saldo Positivo</span>
                                 <div class="relative group">
                                     <span class="cursor-help text-gray-400 hover:text-gray-500 text-xs">ℹ️</span>
-                                    <div class="tooltip-content-small">
-                                        <p class="font-semibold mb-1">Frequência de Saldo Positivo</p>
+                                    <div class="tooltip-content-left">
+                                        <p class="font-bold mb-1 text-gray-900 dark:text-white">Frequência de Saldo Positivo</p>
                                         <p>Avalia quantos meses você encerrou com saldo positivo (receitas > despesas).</p>
                                         <p class="mt-1 text-yellow-600">⚠️ O cálculo considera meses anteriores, não apenas o saldo atual.</p>
                                     </div>
@@ -478,9 +478,35 @@ onMounted(async () => {
     opacity: 1;
 }
 
+/* Tooltip that appears to the right (for items near left sidebar) */
+.tooltip-content-left {
+    position: absolute;
+    left: 0;
+    width: 16rem;
+    padding: 0.75rem;
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    font-size: 0.75rem;
+    color: #4b5563;
+    visibility: hidden;
+    z-index: 9999;
+    transition: all 0.2s;
+    opacity: 0;
+    margin-top: 0.5rem;
+    top: 100%;
+}
+
+.group:hover .tooltip-content-left {
+    visibility: visible;
+    opacity: 1;
+}
+
 /* Dark mode */
 :deep(.dark) .tooltip-content,
-:deep(.dark) .tooltip-content-small {
+:deep(.dark) .tooltip-content-small,
+:deep(.dark) .tooltip-content-left {
     background-color: #1f2937;
     border-color: #374151;
     color: #d1d5db;
@@ -500,9 +526,24 @@ onMounted(async () => {
     border-bottom: 8px solid white;
 }
 
+/* Arrow for left-aligned tooltip */
+.tooltip-content-left::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 16px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid white;
+}
+
 :deep(.dark) .tooltip-content::before,
-:deep(.dark) .tooltip-content-small::before {
+:deep(.dark) .tooltip-content-small::before,
+:deep(.dark) .tooltip-content-left::before {
     border-bottom-color: #1f2937;
 }
 </style>
+
 
