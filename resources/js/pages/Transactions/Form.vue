@@ -161,7 +161,7 @@
                         </div>
                     </div>
 
-                    <!-- Account selection -->
+                    <!-- Account selection for non-credit/debit -->
                     <div v-if="form.type !== 'credito' && form.payment_method !== 'credito' && form.payment_method !== 'debito'">
                         <label class="label">{{ form.type === 'transferencia' ? 'Conta de origem' : 'Conta' }}</label>
                         <select v-model="form.account_id" class="input">

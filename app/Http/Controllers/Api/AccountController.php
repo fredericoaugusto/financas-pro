@@ -119,12 +119,30 @@ class AccountController extends Controller
         ]);
 
         $oldData = $account->toArray();
+
+        // Se o initial_balance foi alterado, criar transação de ajuste
+        $message = 'Conta atualizada com sucesso!';
+        if (isset($validated['initial_balance']) && $validated['initial_balance'] != $account->current_balance) {
+            $targetBalance = floatval($validated['initial_balance']);
+
+            // Usar o AccountService para criar transação de ajuste
+            try {
+                $this->accountService->adjustBalance($account, $targetBalance, $request->user()->id);
+                $message = 'Conta atualizada e saldo ajustado com sucesso! Uma transação de ajuste foi criada.';
+            } catch (\InvalidArgumentException $e) {
+                // Saldo igual, ignora
+            }
+
+            // Remover initial_balance do validated para não sobrescrever diretamente
+            unset($validated['initial_balance']);
+        }
+
         $account->update($validated);
 
         // Note: AuditObserver automatically logs 'update' event
 
         return response()->json([
-            'message' => 'Conta atualizada com sucesso!',
+            'message' => $message,
             'data' => $account->fresh(),
         ]);
     }

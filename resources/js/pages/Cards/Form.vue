@@ -180,7 +180,8 @@ const isEditing = computed(() => !!route.params.id);
 const loading = ref(false);
 const errors = ref({});
 
-const accounts = computed(() => accountsStore.accounts.filter(a => a.status !== 'archived'));
+// Filtrar contas: apenas ativas e que não estão excluídas dos cálculos
+const accounts = computed(() => accountsStore.accounts.filter(a => a.status !== 'archived' && !a.exclude_from_totals));
 
 const form = reactive({
     name: '',

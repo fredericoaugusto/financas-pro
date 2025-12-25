@@ -75,7 +75,7 @@
                     <span class="w-3 h-3 rounded-full bg-red-500"></span>
                     Categorias de Despesa
                 </h3>
-                <div class="space-y-2 max-h-96 overflow-y-auto">
+                <div class="space-y-2">
                     <div
                         v-for="category in expenseCategories"
                         :key="category.id"
