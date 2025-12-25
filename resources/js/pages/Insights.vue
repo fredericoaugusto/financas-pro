@@ -429,7 +429,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Tooltip base styles - consistent across the system */
+/* Tooltip base styles - appear BELOW the trigger to avoid header overlap */
 .tooltip-content {
     position: absolute;
     right: 0;
@@ -442,11 +442,11 @@ onMounted(async () => {
     font-size: 0.875rem;
     color: #4b5563;
     visibility: hidden;
-    z-index: 50;
+    z-index: 9999;
     transition: all 0.2s;
     opacity: 0;
-    margin-bottom: 0.5rem;
-    bottom: 100%;
+    margin-top: 0.5rem;
+    top: 100%;
 }
 
 .group:hover .tooltip-content {
@@ -466,11 +466,11 @@ onMounted(async () => {
     font-size: 0.75rem;
     color: #4b5563;
     visibility: hidden;
-    z-index: 50;
+    z-index: 9999;
     transition: all 0.2s;
     opacity: 0;
-    margin-bottom: 0.5rem;
-    bottom: 100%;
+    margin-top: 0.5rem;
+    top: 100%;
 }
 
 .group:hover .tooltip-content-small {
@@ -486,22 +486,23 @@ onMounted(async () => {
     color: #d1d5db;
 }
 
-/* Tooltip arrow */
+/* Tooltip arrow - pointing UP since tooltip is below */
 .tooltip-content::before,
 .tooltip-content-small::before {
     content: '';
     position: absolute;
-    bottom: -8px;
+    top: -8px;
     right: 16px;
     width: 0;
     height: 0;
     border-left: 8px solid transparent;
     border-right: 8px solid transparent;
-    border-top: 8px solid white;
+    border-bottom: 8px solid white;
 }
 
 :deep(.dark) .tooltip-content::before,
 :deep(.dark) .tooltip-content-small::before {
-    border-top-color: #1f2937;
+    border-bottom-color: #1f2937;
 }
 </style>
+
