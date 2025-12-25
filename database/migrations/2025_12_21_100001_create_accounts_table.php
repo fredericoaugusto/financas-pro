@@ -21,6 +21,7 @@ return new class extends Migration {
             $table->string('account_number')->nullable();
             $table->text('notes')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->string('status')->default('active'); // 'active' or 'archived'
             $table->timestamps();
             $table->softDeletes();
 

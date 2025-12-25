@@ -21,7 +21,7 @@ return new class extends Migration {
             $table->enum('type', ['debito', 'credito', 'hibrido'])->default('credito');
             $table->unsignedTinyInteger('closing_day'); // 1-28
             $table->unsignedTinyInteger('due_day'); // 1-31
-            $table->enum('status', ['ativo', 'bloqueado', 'cancelado', 'expirado'])->default('ativo');
+            $table->enum('status', ['ativo', 'bloqueado', 'cancelado', 'expirado', 'arquivado'])->default('ativo');
             $table->string('icon')->nullable();
             $table->string('color')->nullable();
             $table->text('notes')->nullable();

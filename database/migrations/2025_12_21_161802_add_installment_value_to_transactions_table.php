@@ -11,17 +11,14 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('transactions', function (Blueprint $table) {
-            $table->decimal('installment_value', 12, 2)->nullable()->after('total_installments');
+            $table->decimal('installment_value', 12, 2)->nullable();
         });
 
-        // Adicionar status de arquivamento na tabela accounts
-        Schema::table('accounts', function (Blueprint $table) {
-            $table->enum('status', ['active', 'archived'])->default('active')->after('is_active');
-        });
+        // accounts.status is now in the original create_accounts_table migration
 
         // Adicionar account_id na tabela cards (vinculação com conta)
         Schema::table('cards', function (Blueprint $table) {
-            $table->foreignId('account_id')->nullable()->after('user_id')->constrained()->onDelete('set null');
+            $table->foreignId('account_id')->nullable()->constrained()->onDelete('set null');
         });
     }
 
@@ -32,10 +29,6 @@ return new class extends Migration {
     {
         Schema::table('transactions', function (Blueprint $table) {
             $table->dropColumn('installment_value');
-        });
-
-        Schema::table('accounts', function (Blueprint $table) {
-            $table->dropColumn('status');
         });
 
         Schema::table('cards', function (Blueprint $table) {
