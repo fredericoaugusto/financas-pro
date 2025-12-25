@@ -252,6 +252,13 @@
                         </p>
                     </div>
 
+                    <!-- Microcopy info -->
+                    <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                        <p class="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                            <span>💡</span>
+                            <span>Este valor serve apenas para acompanhar sua meta. Não movimenta suas contas.</span>
+                        </p>
+                    </div>
                     <div class="flex gap-3">
                         <button type="button" @click="closeActionModal" class="btn btn-secondary flex-1">Cancelar</button>
                         <button 
