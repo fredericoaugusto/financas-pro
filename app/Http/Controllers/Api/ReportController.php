@@ -135,7 +135,10 @@ class ReportController extends Controller
             $query->where('payment_method', $request->payment_method);
         }
         if ($request->filled('search')) {
-            $query->where('description', 'like', '%' . $request->search . '%');
+            $query->whereRaw(
+                'LOWER(description) LIKE ?',
+                ['%' . strtolower($request->search) . '%']
+            );
         }
 
         $transactions = $query->orderBy('date', 'desc')->get();

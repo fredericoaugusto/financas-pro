@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Transaction;
+use App\Support\DatabaseDateHelper;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 
@@ -80,9 +81,12 @@ class TransactionFilterService
             $query->where('status', $filters['status']);
         }
 
-        // Busca por descrição
+        // Busca por descrição (case-insensitive para compatibilidade com Postgres)
         if (!empty($filters['search'])) {
-            $query->where('description', 'like', "%{$filters['search']}%");
+            $query->whereRaw(
+                'LOWER(description) LIKE ?',
+                ['%' . strtolower($filters['search']) . '%']
+            );
         }
 
         // Filtro por método de pagamento (suporta array ou string única)
@@ -261,7 +265,8 @@ class TransactionFilterService
 
         $query = $this->apply($query, $filters);
 
-        $monthlyData = $query->selectRaw("strftime('%Y-%m', date) as month, type, SUM(value) as total")
+        $monthExpression = DatabaseDateHelper::monthYear('date');
+        $monthlyData = $query->selectRaw("{$monthExpression} as month, type, SUM(value) as total")
             ->groupBy('month', 'type')
             ->orderBy('month')
             ->get()

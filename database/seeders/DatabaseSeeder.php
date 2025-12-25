@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -13,14 +12,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Categorias padrão do sistema
+        // 1. Categorias padrão do sistema
         $this->call(CategorySeeder::class);
 
-        // User::factory(10)->create();
+        // 2. Usuário de Teste
+        User::firstOrCreate(
+            ['email' => 'test@example.com'],
+            ['name' => 'Usuário Teste', 'password' => bcrypt('password')]
+        );
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        $this->command->info('Ambiente básico restaurado com sucesso!');
     }
 }
