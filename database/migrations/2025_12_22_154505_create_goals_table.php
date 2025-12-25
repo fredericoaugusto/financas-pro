@@ -22,7 +22,7 @@ return new class extends Migration {
             $table->string('color')->default('#6366F1'); // Indigo
             $table->decimal('target_value', 15, 2);
             $table->decimal('current_value', 15, 2)->default(0);
-            $table->enum('status', ['em_andamento', 'concluido', 'cancelado'])->default('em_andamento');
+            $table->string('status', 15)->default('em_andamento'); // em_andamento, concluido, cancelado
             $table->date('target_date')->nullable(); // Data limite opcional
             $table->timestamps();
 

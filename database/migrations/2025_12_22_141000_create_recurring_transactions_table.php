@@ -22,17 +22,17 @@ return new class extends Migration {
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
 
             // Dados da transação template
-            $table->enum('type', ['receita', 'despesa', 'transferencia']);
+            $table->string('type', 15); // receita, despesa, transferencia
             $table->decimal('value', 15, 2);
             $table->string('description');
             $table->foreignId('category_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('account_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('card_id')->nullable()->constrained()->nullOnDelete();
-            $table->enum('payment_method', ['dinheiro', 'debito', 'credito', 'pix', 'boleto', 'transferencia'])->default('dinheiro');
+            $table->string('payment_method', 20)->default('dinheiro'); // dinheiro, debito, credito, pix, boleto, transferencia
             $table->text('notes')->nullable();
 
             // Configuração da recorrência
-            $table->enum('frequency', ['semanal', 'mensal', 'anual', 'personalizada'])->default('mensal');
+            $table->string('frequency', 15)->default('mensal'); // semanal, mensal, anual, personalizada
             $table->integer('frequency_value')->default(1); // a cada X (semanas/meses/anos/dias)
 
             // Controle de período
@@ -42,7 +42,7 @@ return new class extends Migration {
             $table->date('last_generated_at')->nullable(); // Última geração (evita duplicações)
 
             // Status
-            $table->enum('status', ['ativa', 'pausada', 'encerrada', 'concluida'])->default('ativa');
+            $table->string('status', 15)->default('ativa'); // ativa, pausada, encerrada, concluida
 
             $table->timestamps();
             $table->softDeletes();

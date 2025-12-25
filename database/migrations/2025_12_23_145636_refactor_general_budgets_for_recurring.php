@@ -62,7 +62,7 @@ return new class extends Migration {
                 $table->renameColumn('amount', 'limit_value');
                 $table->renameColumn('type', 'period_type');
                 $table->date('start_date')->nullable()->after('period_type');
-                $table->enum('status', ['active', 'paused', 'ended'])->default('active')->after('start_date');
+                $table->string('status', 10)->default('active')->after('start_date'); // active, paused, ended
                 $table->dropColumn(['month', 'year', 'is_active', 'alert_80_sent', 'alert_100_sent']);
             });
 

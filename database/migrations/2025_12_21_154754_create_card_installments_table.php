@@ -18,7 +18,7 @@ return new class extends Migration {
             $table->integer('total_installments'); // Total de parcelas
             $table->decimal('value', 12, 2); // Valor da parcela
             $table->date('due_date'); // Data prevista para cobrança na fatura
-            $table->enum('status', ['pendente', 'em_fatura', 'paga', 'estornada', 'antecipada'])->default('pendente');
+            $table->string('status', 15)->default('pendente'); // pendente, em_fatura, paga, estornada, antecipada
             $table->timestamps();
 
         });

@@ -13,15 +13,15 @@ return new class extends Migration {
             $table->foreignId('primary_account_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->string('name');
             $table->string('bank');
-            $table->enum('brand', ['visa', 'mastercard', 'elo', 'amex', 'diners', 'hipercard', 'discover']);
+            $table->string('brand', 20); // visa, mastercard, elo, amex, diners, hipercard, discover
             $table->string('holder_name');
             $table->string('last_4_digits', 4);
             $table->string('valid_thru', 7); // MM/AAAA
             $table->decimal('credit_limit', 15, 2);
-            $table->enum('type', ['debito', 'credito', 'hibrido'])->default('credito');
+            $table->string('type', 10)->default('credito'); // debito, credito, hibrido
             $table->unsignedTinyInteger('closing_day'); // 1-28
             $table->unsignedTinyInteger('due_day'); // 1-31
-            $table->enum('status', ['ativo', 'bloqueado', 'cancelado', 'expirado', 'arquivado'])->default('ativo');
+            $table->string('status', 15)->default('ativo'); // ativo, bloqueado, cancelado, expirado, arquivado
             $table->string('icon')->nullable();
             $table->string('color')->nullable();
             $table->text('notes')->nullable();

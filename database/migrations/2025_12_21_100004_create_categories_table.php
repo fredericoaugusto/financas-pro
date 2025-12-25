@@ -11,7 +11,7 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
             $table->string('name');
-            $table->enum('type', ['receita', 'despesa']);
+            $table->string('type', 10); // receita, despesa
             $table->string('icon')->nullable();
             $table->string('color')->nullable();
             $table->foreignId('parent_id')->nullable()->constrained('categories')->onDelete('cascade');

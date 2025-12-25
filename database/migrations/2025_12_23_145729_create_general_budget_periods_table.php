@@ -17,7 +17,7 @@ return new class extends Migration {
             $table->unsignedTinyInteger('reference_month')->nullable(); // null for yearly
             $table->decimal('limit_value_snapshot', 12, 2); // limit at the time
             $table->decimal('spent', 12, 2)->default(0); // cached spent value
-            $table->enum('status', ['ok', 'warning', 'exceeded'])->default('ok');
+            $table->string('status', 10)->default('ok'); // ok, warning, exceeded
             $table->boolean('alert_80_sent')->default(false);
             $table->boolean('alert_100_sent')->default(false);
             $table->timestamps();

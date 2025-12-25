@@ -17,7 +17,7 @@ return new class extends Migration {
             $table->date('due_date');
             $table->decimal('total_value', 15, 2)->default(0);
             $table->decimal('paid_value', 15, 2)->default(0);
-            $table->enum('status', ['aberta', 'fechada', 'parcialmente_paga', 'paga', 'vencida'])->default('aberta');
+            $table->string('status', 20)->default('aberta'); // aberta, fechada, parcialmente_paga, paga, vencida
             $table->timestamps();
 
             // Uma fatura por mês por cartão

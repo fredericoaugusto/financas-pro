@@ -16,12 +16,13 @@ return new class extends Migration {
             $table->foreignId('category_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('card_invoice_id')->nullable()->constrained('card_invoices')->nullOnDelete();
 
-            $table->enum('type', ['receita', 'despesa', 'transferencia', 'ajuste', 'devolucao', 'antecipacao_parcela']);
+            // Usar string ao invés de enum para compatibilidade PostgreSQL/SQLite
+            $table->string('type', 30); // receita, despesa, transferencia, ajuste, devolucao, antecipacao_parcela
             $table->decimal('value', 15, 2);
             $table->string('description');
             $table->date('date');
             $table->time('time')->nullable();
-            $table->enum('payment_method', ['dinheiro', 'debito', 'credito', 'pix', 'boleto', 'transferencia'])->nullable();
+            $table->string('payment_method', 20)->nullable(); // dinheiro, debito, credito, pix, boleto, transferencia
 
             // Parcelamento
             $table->foreignId('parent_transaction_id')->nullable()->constrained('transactions')->nullOnDelete();
@@ -37,7 +38,7 @@ return new class extends Migration {
             // Transação pai de parcelamento NÃO afeta saldo (evita duplicidade)
             $table->boolean('affects_balance')->default(true);
 
-            $table->enum('status', ['pendente', 'confirmada', 'cancelada', 'antecipada', 'estornada'])->default('confirmada');
+            $table->string('status', 20)->default('confirmada'); // pendente, confirmada, cancelada, antecipada, estornada
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();

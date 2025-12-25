@@ -15,7 +15,7 @@ return new class extends Migration {
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('name')->default('Orçamento Geral');
             $table->decimal('amount', 12, 2);
-            $table->enum('type', ['mensal', 'anual'])->default('mensal');
+            $table->string('type', 10)->default('mensal'); // mensal, anual
             $table->json('category_ids')->nullable(); // null = todas as categorias
             $table->boolean('include_future_categories')->default(false);
             $table->unsignedTinyInteger('month')->nullable(); // null for annual

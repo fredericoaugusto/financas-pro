@@ -10,7 +10,7 @@ return new class extends Migration {
         Schema::create('accounts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->enum('type', ['corrente', 'poupanca', 'carteira_digital', 'investimento', 'caixa', 'credito']);
+            $table->string('type', 20); // corrente, poupanca, carteira_digital, investimento, caixa, credito
             $table->string('name');
             $table->decimal('initial_balance', 15, 2)->default(0);
             $table->string('currency', 3)->default('BRL');
