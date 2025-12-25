@@ -36,8 +36,8 @@
                                 ℹ️
                             </span>
                             <div class="tooltip-content">
-                                <p class="font-bold mb-2 text-gray-900 dark:text-white">Como calculamos seu score?</p>
-                                <p class="mb-2">Seu score é composto por 5 fatores:</p>
+                                <p class="font-semibold mb-2">Como calculamos seu score?</p>
+                                <p class="mb-2 text-gray-600">Seu score é composto por 5 fatores:</p>
                                 <ul class="list-disc pl-4 space-y-1">
                                     <li>Estabilidade dos gastos mensais</li>
                                     <li>Frequência de saldo positivo</li>
@@ -80,7 +80,7 @@
                                 <div class="relative group">
                                     <span class="cursor-help text-gray-400 hover:text-gray-500 text-xs">ℹ️</span>
                                     <div class="tooltip-content-left">
-                                        <p class="font-bold mb-1 text-gray-900 dark:text-white">Estabilidade Financeira</p>
+                                        <p class="font-semibold mb-1">Estabilidade Financeira</p>
                                         <p>Mede o quanto seus gastos variam de um mês para outro. Quanto menor a variação, maior sua estabilidade financeira.</p>
                                         <p class="mt-1 text-gray-500">• Baixa variação → melhor previsibilidade</p>
                                         <p class="text-gray-500">• Alta variação → maior risco financeiro</p>
@@ -100,7 +100,7 @@
                                 <div class="relative group">
                                     <span class="cursor-help text-gray-400 hover:text-gray-500 text-xs">ℹ️</span>
                                     <div class="tooltip-content-left">
-                                        <p class="font-bold mb-1 text-gray-900 dark:text-white">Frequência de Saldo Positivo</p>
+                                        <p class="font-semibold mb-1">Frequência de Saldo Positivo</p>
                                         <p>Avalia quantos meses você encerrou com saldo positivo (receitas > despesas).</p>
                                         <p class="mt-1 text-yellow-600">⚠️ O cálculo considera meses anteriores, não apenas o saldo atual.</p>
                                     </div>
