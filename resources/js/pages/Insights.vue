@@ -431,25 +431,77 @@ onMounted(async () => {
 <style scoped>
 /* Tooltip base styles - consistent across the system */
 .tooltip-content {
-    @apply absolute right-0 w-72 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 invisible group-hover:visible z-50 transition-all duration-200 opacity-0 group-hover:opacity-100 mb-2 bottom-full;
+    position: absolute;
+    right: 0;
+    width: 18rem;
+    padding: 1rem;
+    background-color: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border: 1px solid #e5e7eb;
+    font-size: 0.875rem;
+    color: #4b5563;
+    visibility: hidden;
+    z-index: 50;
+    transition: all 0.2s;
+    opacity: 0;
+    margin-bottom: 0.5rem;
+    bottom: 100%;
+}
+
+.group:hover .tooltip-content {
+    visibility: visible;
+    opacity: 1;
 }
 
 .tooltip-content-small {
-    @apply absolute right-0 w-64 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-300 invisible group-hover:visible z-50 transition-all duration-200 opacity-0 group-hover:opacity-100 mb-2 bottom-full;
+    position: absolute;
+    right: 0;
+    width: 16rem;
+    padding: 0.75rem;
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    font-size: 0.75rem;
+    color: #4b5563;
+    visibility: hidden;
+    z-index: 50;
+    transition: all 0.2s;
+    opacity: 0;
+    margin-bottom: 0.5rem;
+    bottom: 100%;
 }
 
-/* Ensure tooltips don't get cut off on edges */
+.group:hover .tooltip-content-small {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Dark mode */
+:deep(.dark) .tooltip-content,
+:deep(.dark) .tooltip-content-small {
+    background-color: #1f2937;
+    border-color: #374151;
+    color: #d1d5db;
+}
+
+/* Tooltip arrow */
 .tooltip-content::before,
 .tooltip-content-small::before {
     content: '';
-    @apply absolute -bottom-2 right-4 w-0 h-0;
+    position: absolute;
+    bottom: -8px;
+    right: 16px;
+    width: 0;
+    height: 0;
     border-left: 8px solid transparent;
     border-right: 8px solid transparent;
     border-top: 8px solid white;
 }
 
-.dark .tooltip-content::before,
-.dark .tooltip-content-small::before {
+:deep(.dark) .tooltip-content::before,
+:deep(.dark) .tooltip-content-small::before {
     border-top-color: #1f2937;
 }
 </style>
