@@ -545,7 +545,7 @@ class ReportController extends Controller
         $endDate = $request->input('date_to', Carbon::now()->endOfMonth()->format('Y-m-d'));
 
         $cards = \App\Models\Card::where('user_id', $userId)
-            ->where('is_archived', false)
+            ->where('status', '!=', 'arquivado')
             ->withSum([
                 'transactions as total_spent' => function ($query) use ($startDate, $endDate) {
                     $query->where('type', 'despesa')
@@ -590,7 +590,7 @@ class ReportController extends Controller
             ->with('category')
             ->get();
 
-        $totalBudgeted = $budgets->sum('amount');
+        $totalBudgeted = $budgets->sum('limit_value');
         $totalActual = 0;
 
         foreach ($budgets as $budget) {
@@ -648,8 +648,8 @@ class ReportController extends Controller
                     'category' => $budget->category?->name ?? 'Sem categoria',
                     'color' => $budget->category?->color ?? '#6b7280',
                     'consumed' => $spent,
-                    'budget' => $budget->amount,
-                    'percentage' => $budget->amount > 0 ? round(($spent / $budget->amount) * 100, 1) : 0,
+                    'budget' => $budget->limit_value,
+                    'percentage' => $budget->limit_value > 0 ? round(($spent / $budget->limit_value) * 100, 1) : 0,
                 ];
             }
         }
@@ -688,16 +688,16 @@ class ReportController extends Controller
                 ->whereBetween('date', [$startDate, $endDate])
                 ->sum('value');
 
-            $percentage = $budget->amount > 0 ? ($spent / $budget->amount) * 100 : 0;
+            $percentage = $budget->limit_value > 0 ? ($spent / $budget->limit_value) * 100 : 0;
 
             if ($percentage >= 80) {
                 $alerts[] = [
                     'id' => $budget->id,
                     'category' => $budget->category?->name ?? 'Sem categoria',
                     'color' => $budget->category?->color ?? '#6b7280',
-                    'budget' => $budget->amount,
+                    'budget' => $budget->limit_value,
                     'spent' => $spent,
-                    'remaining' => $budget->amount - $spent,
+                    'remaining' => $budget->limit_value - $spent,
                     'percentage' => round($percentage, 1),
                     'status' => $percentage >= 100 ? 'exceeded' : 'warning',
                 ];
