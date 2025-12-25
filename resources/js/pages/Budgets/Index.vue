@@ -8,8 +8,19 @@
                     <p class="text-gray-500 dark:text-gray-400">Controle seus gastos por categoria</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <!-- Period type toggle -->
+                <!-- Period type toggle -->
                     <div class="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                        <button 
+                            @click="setPeriodType('todos')"
+                            :class="[
+                                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                                periodType === 'todos' 
+                                    ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm' 
+                                    : 'text-gray-500 hover:text-gray-700'
+                            ]"
+                        >
+                            Todos
+                        </button>
                         <button 
                             @click="setPeriodType('mensal')"
                             :class="[
@@ -68,13 +79,23 @@
                     </h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400">Controle seus gastos totais do período</p>
                 </div>
-                <button 
-                    v-if="!hasGeneralBudgetForCurrentPeriod" 
-                    @click="openGeneralBudgetModal" 
-                    class="btn-secondary btn-sm"
-                >
-                    + Criar Orçamento {{ periodType === 'mensal' ? 'Mensal' : 'Anual' }}
-                </button>
+                <!-- Buttons to create missing budget types (shown in Todos mode or specific mode) -->
+                <div class="flex gap-2">
+                    <button 
+                        v-if="(periodType === 'todos' || periodType === 'mensal') && missingMonthlyBudget" 
+                        @click="openGeneralBudgetModalWithType('monthly')" 
+                        class="btn-secondary btn-sm"
+                    >
+                        + Criar Mensal
+                    </button>
+                    <button 
+                        v-if="(periodType === 'todos' || periodType === 'anual') && missingYearlyBudget" 
+                        @click="openGeneralBudgetModalWithType('yearly')" 
+                        class="btn-secondary btn-sm"
+                    >
+                        + Criar Anual
+                    </button>
+                </div>
             </div>
 
             <!-- General Budget Card (filtered by period type) -->
@@ -93,6 +114,10 @@
                         <div>
                             <h3 class="text-xl font-bold text-gray-900 dark:text-white">
                                 {{ budget.name }}
+                                <span class="ml-2 text-sm font-normal px-2 py-0.5 rounded-full" 
+                                      :class="budget.period_type === 'monthly' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'">
+                                    {{ budget.period_type === 'monthly' ? 'Mensal' : 'Anual' }}
+                                </span>
                                 <span v-if="budget.status === 'paused'" class="ml-2 text-sm text-yellow-600">(Pausado)</span>
                             </h3>
                             <p class="text-sm text-gray-500">
@@ -157,22 +182,38 @@
                 <p v-if="getBudgetPercentage(budget) < 20" class="text-sm text-gray-500 mt-2 text-right">{{ Math.round(getBudgetPercentage(budget)) }}% utilizado</p>
             </div>
 
-            <!-- No General Budget for current period type -->
-            <div v-if="filteredGeneralBudgets.length === 0" class="card mb-4 border-2 border-dashed border-gray-200 dark:border-gray-700 text-center py-8">
+            <!-- Empty state when no general budget exists at all -->
+            <div v-if="filteredGeneralBudgets.length === 0 && periodType !== 'todos'" class="card mb-4 border-2 border-dashed border-gray-200 dark:border-gray-700 text-center py-8">
                 <svg class="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 <p class="text-gray-500 mb-3">Você ainda não tem um orçamento geral {{ periodType === 'mensal' ? 'mensal' : 'anual' }}</p>
-                <button @click="openGeneralBudgetModal" class="btn-primary btn-sm">
+                <button @click="openGeneralBudgetModalWithType(periodType === 'mensal' ? 'monthly' : 'yearly')" class="btn-primary btn-sm">
                     + Criar Orçamento {{ periodType === 'mensal' ? 'Mensal' : 'Anual' }}
                 </button>
+            </div>
+
+            <!-- Empty state for Todos mode when no budgets exist -->
+            <div v-if="filteredGeneralBudgets.length === 0 && periodType === 'todos'" class="card mb-4 border-2 border-dashed border-gray-200 dark:border-gray-700 text-center py-8">
+                <svg class="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <p class="text-gray-500 mb-3">Você ainda não tem nenhum orçamento geral</p>
+                <div class="flex justify-center gap-2">
+                    <button @click="openGeneralBudgetModalWithType('monthly')" class="btn-primary btn-sm">
+                        + Criar Mensal
+                    </button>
+                    <button @click="openGeneralBudgetModalWithType('yearly')" class="btn-secondary btn-sm">
+                        + Criar Anual
+                    </button>
+                </div>
             </div>
         </section>
 
 
         <!-- ============ SEÇÃO 2: ORÇAMENTOS POR CATEGORIA ============ -->
-        <!-- Only shown when periodType is mensal (categories are monthly only) -->
-        <section v-if="periodType === 'mensal'" class="mt-8">
+        <!-- Shown when periodType is 'todos' or 'mensal' (categories are monthly only) -->
+        <section v-if="periodType === 'mensal' || periodType === 'todos'" class="mt-8">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -326,7 +367,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p class="text-gray-500">Orçamentos por categoria são apenas mensais.</p>
-            <p class="text-sm text-gray-400 mt-1">Alterne para o modo Mensal para visualizá-los.</p>
+            <p class="text-sm text-gray-400 mt-1">Alterne para <strong>Todos</strong> ou <strong>Mensal</strong> para visualizá-los.</p>
         </div>
 
         <!-- Create/Edit Modal -->
@@ -740,7 +781,7 @@ const categoriesStore = useCategoriesStore();
 const selectedMonth = ref(new Date().getMonth() + 1);
 const selectedYear = ref(new Date().getFullYear());
 const selectorMode = ref('month');
-const periodType = ref('mensal'); // 'mensal' or 'anual'
+const periodType = ref('todos'); // 'todos', 'mensal' or 'anual'
 
 const showModal = ref(false);
 const showDeleteModal = ref(false);
@@ -762,8 +803,20 @@ const selectedGeneralBudget = ref(null); // For editing/viewing
 
 // Computed: Filter general budgets by current period type selection
 const filteredGeneralBudgets = computed(() => {
+    if (periodType.value === 'todos') {
+        // Show all general budgets
+        return generalBudgets.value;
+    }
     const type = periodType.value === 'mensal' ? 'monthly' : 'yearly';
     return generalBudgets.value.filter(b => b.period_type === type);
+});
+
+// Computed: Check which budget types are missing (for "Todos" view)
+const missingMonthlyBudget = computed(() => {
+    return !generalBudgets.value.some(b => b.period_type === 'monthly');
+});
+const missingYearlyBudget = computed(() => {
+    return !generalBudgets.value.some(b => b.period_type === 'yearly');
 });
 
 // Computed: Check if we already have a general budget for the current period type
@@ -1066,6 +1119,18 @@ function openGeneralBudgetModal() {
     showGeneralBudgetModal.value = true;
 }
 
+// Open modal with a specific period type pre-selected
+function openGeneralBudgetModalWithType(type) {
+    selectedGeneralBudget.value = null;
+    generalBudgetForm.value = {
+        name: '',
+        limit_value: 0,
+        period_type: type, // 'monthly' or 'yearly'
+        include_future_categories: true,
+    };
+    showGeneralBudgetModal.value = true;
+}
+
 function openGeneralBudgetModalForEdit(budget) {
     selectedGeneralBudget.value = budget;
     generalBudgetForm.value = {
@@ -1112,11 +1177,13 @@ function getMonthName(month) {
     return months[month - 1];
 }
 
-// Current period string (for category budgets)
+// Current period string (for category budgets - 'todos' is treated as 'mensal')
 const currentBudgetPeriodString = computed(() => {
+    // Only use year-only format for 'anual' mode
     if (periodType.value === 'anual') {
         return String(selectedYear.value);
     }
+    // 'todos' and 'mensal' use month format for category budgets
     return `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}`;
 });
 
@@ -1128,8 +1195,12 @@ const availableCategories = computed(() => {
 
 function setPeriodType(type) {
     periodType.value = type;
-    // Update selector mode to match
-    selectorMode.value = type === 'anual' ? 'year' : 'month';
+    // Update selector mode to match (todos uses month since we show category budgets)
+    if (type === 'anual') {
+        selectorMode.value = 'year';
+    } else {
+        selectorMode.value = 'month';
+    }
     loadData();
 }
 
