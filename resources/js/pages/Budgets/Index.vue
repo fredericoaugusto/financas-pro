@@ -52,234 +52,281 @@
 
         <!-- Dismissable info banner -->
         <DismissableBanner storage-key="budgets-info" color="indigo">
-            <strong>Como funciona:</strong> Defina limites por categoria e acompanhe seus gastos em tempo real.
+            <strong>Como funciona:</strong> Defina limites e acompanhe seus gastos em tempo real.
             O sistema <strong>nunca bloqueia</strong> um lançamento — apenas alerta quando você está se aproximando do limite.
-            <span v-if="periodType === 'anual'" class="block mt-1">
-                <strong>Modo anual:</strong> O consumo é calculado sobre todas as despesas do ano selecionado.
-            </span>
         </DismissableBanner>
 
-        <!-- General Budget Cards -->
-        <div v-for="budget in generalBudgets" :key="budget.id" 
-             class="card mb-4 border-2" 
-             :class="budget.status === 'paused' ? 'border-yellow-300 dark:border-yellow-700 opacity-75' : 'border-primary-200 dark:border-primary-800'"
-             @click="openTransactionHistoryModal(budget)">
+        <!-- ============ SEÇÃO 1: ORÇAMENTO GERAL ============ -->
+        <section class="mb-8">
             <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-xl flex items-center justify-center"
-                         :class="budget.status === 'paused' ? 'bg-yellow-100 dark:bg-yellow-900/50' : 'bg-primary-100 dark:bg-primary-900/50'">
-                        <svg class="w-6 h-6" :class="budget.status === 'paused' ? 'text-yellow-600 dark:text-yellow-400' : 'text-primary-600 dark:text-primary-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                            {{ budget.name }}
-                            <span v-if="budget.status === 'paused'" class="ml-2 text-sm text-yellow-600">(Pausado)</span>
-                        </h3>
-                        <p class="text-sm text-gray-500">
-                            {{ formatCurrency(getBudgetSpent(budget)) }} de {{ formatCurrency(budget.limit_value) }}
-                            <span class="ml-2">• {{ budget.period_type === 'monthly' ? 'Mensal' : 'Anual' }}</span>
-                            <span v-if="getBudgetCurrentPeriod(budget)" class="ml-2 text-gray-400">• {{ getBudgetPeriodLabel(budget) }}</span>
-                        </p>
-                    </div>
+                        Orçamento Geral
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Controle seus gastos totais do período</p>
                 </div>
-                <div class="flex items-center gap-2" @click.stop>
-                    <span v-if="getBudgetCurrentPeriod(budget)" :class="getGeneralBudgetStatusClass(getBudgetCurrentPeriod(budget)?.status || 'ok')">
-                        {{ getGeneralBudgetStatusLabel(getBudgetCurrentPeriod(budget)?.status || 'ok') }}
-                    </span>
-                    <!-- Pause/Resume button -->
-                    <button 
-                        v-if="budget.status === 'active'" 
-                        @click="pauseGeneralBudgetById(budget.id)" 
-                        class="p-2 text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 rounded-lg"
-                        title="Pausar"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </button>
-                    <button 
-                        v-else-if="budget.status === 'paused'" 
-                        @click="resumeGeneralBudgetById(budget.id)" 
-                        class="p-2 text-green-500 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg"
-                        title="Retomar"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </button>
-                    <!-- Edit button -->
-                    <button @click="openGeneralBudgetModalForEdit(budget)" class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" title="Editar">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                    </button>
-                    <!-- Delete button -->
-                    <button @click="confirmDeleteGeneralBudget(budget)" class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg" title="Excluir">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </div>
+                <button 
+                    v-if="!hasGeneralBudgetForCurrentPeriod" 
+                    @click="openGeneralBudgetModal" 
+                    class="btn-secondary btn-sm"
+                >
+                    + Criar Orçamento {{ periodType === 'mensal' ? 'Mensal' : 'Anual' }}
+                </button>
             </div>
-            <!-- Progress bar -->
-            <div class="relative h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div 
-                    class="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
-                    :class="getGeneralProgressBarClass(getBudgetCurrentPeriod(budget)?.status || 'ok')"
-                    :style="{ width: Math.min(getBudgetPercentage(budget), 100) + '%' }"
-                ></div>
-            </div>
-            <p class="text-sm text-gray-500 mt-2 text-right">{{ Math.round(getBudgetPercentage(budget)) }}% utilizado</p>
-        </div>
 
-        <!-- No General Budget - Option to create -->
-        <div v-if="generalBudgets.length === 0" class="card mb-6 border-2 border-dashed border-gray-200 dark:border-gray-700 text-center py-6">
-            <svg class="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            <p class="text-gray-500 mb-3">Defina um orçamento geral para controlar seus gastos totais</p>
-            <button @click="openGeneralBudgetModal" class="btn-primary btn-sm">
-                + Criar Orçamento Geral
-            </button>
-        </div>
-
-        <!-- Option to create second type if only one exists -->
-        <div v-else-if="canCreateAnotherGeneralBudget" class="mb-4 text-center">
-            <button @click="openGeneralBudgetModal" class="btn-secondary btn-sm">
-                + Criar Orçamento {{ missingGeneralBudgetType === 'monthly' ? 'Mensal' : 'Anual' }}
-            </button>
-        </div>
-
-        <!-- Totals summary (Category Budgets) -->
-        <div v-if="totals && budgets.length > 0" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="card text-center">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Total Orçado</p>
-                <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatCurrency(totals.limit) }}</p>
-            </div>
-            <div class="card text-center">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Total Consumido</p>
-                <p class="text-xl font-bold text-red-600">{{ formatCurrency(totals.consumed) }}</p>
-            </div>
-            <div class="card text-center">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Disponível</p>
-                <p :class="['text-xl font-bold', totals.remaining >= 0 ? 'text-green-600' : 'text-red-600']">
-                    {{ formatCurrency(totals.remaining) }}
-                </p>
-            </div>
-            <div class="card text-center">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Uso Geral</p>
-                <p :class="['text-xl font-bold', getPercentageColor(totals.percentage)]">{{ totals.percentage }}%</p>
-            </div>
-        </div>
-
-        <!-- Loading -->
-        <div v-if="loading" class="flex justify-center py-12">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
-        </div>
-
-        <!-- Empty state -->
-        <div v-else-if="budgets.length === 0" class="card text-center py-12">
-            <svg class="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                Nenhum orçamento {{ periodType === 'anual' ? 'anual' : 'mensal' }} definido
-            </h3>
-            <p class="text-gray-500 dark:text-gray-400 mb-4">
-                Comece criando um orçamento {{ periodType === 'anual' ? 'anual' : 'mensal' }} para uma categoria.
-            </p>
-            <button @click="openCreateModal" class="btn btn-primary">
-                Criar Primeiro Orçamento
-            </button>
-        </div>
-
-        <!-- Budgets list -->
-        <div v-else class="space-y-4">
-            <div 
-                v-for="budget in budgets" 
-                :key="budget.id"
-                class="card hover:shadow-md transition-shadow cursor-pointer"
-                @click="openCategoryBudgetHistoryModal(budget)"
-            >
-                <div class="flex items-center justify-between mb-3">
+            <!-- General Budget Card (filtered by period type) -->
+            <div v-for="budget in filteredGeneralBudgets" :key="budget.id" 
+                 class="card mb-4 border-2 cursor-pointer hover:shadow-lg transition-shadow" 
+                 :class="budget.status === 'paused' ? 'border-yellow-300 dark:border-yellow-700 opacity-75' : 'border-primary-300 dark:border-primary-700 bg-gradient-to-r from-primary-50/50 to-transparent dark:from-primary-900/20'"
+                 @click="openTransactionHistoryModal(budget)">
+                <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center gap-3">
-                        <!-- Category icon -->
-                        <div 
-                            class="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg"
-                            :style="{ backgroundColor: budget.category?.color || '#6B7280' }"
-                        >
-                            {{ budget.category?.icon || '📊' }}
+                        <div class="w-14 h-14 rounded-xl flex items-center justify-center"
+                             :class="budget.status === 'paused' ? 'bg-yellow-100 dark:bg-yellow-900/50' : 'bg-primary-100 dark:bg-primary-900/50'">
+                            <svg class="w-7 h-7" :class="budget.status === 'paused' ? 'text-yellow-600 dark:text-yellow-400' : 'text-primary-600 dark:text-primary-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
                         </div>
                         <div>
-                            <h3 class="font-semibold text-gray-900 dark:text-white">
-                                {{ budget.category?.name || 'Categoria' }}
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">
+                                {{ budget.name }}
+                                <span v-if="budget.status === 'paused'" class="ml-2 text-sm text-yellow-600">(Pausado)</span>
                             </h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                {{ formatCurrency(budget.consumed_value) }} de {{ formatCurrency(budget.limit_value) }}
+                            <p class="text-sm text-gray-500">
+                                {{ formatCurrency(getBudgetSpent(budget)) }} de {{ formatCurrency(budget.limit_value) }}
+                                <span v-if="getBudgetCurrentPeriod(budget)" class="ml-2 text-gray-400">• {{ getBudgetPeriodLabel(budget) }}</span>
                             </p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-4">
-                        <!-- Status badge -->
-                        <span :class="getStatusBadgeClass(budget.status)">
-                            {{ getStatusLabel(budget.status) }}
+                    <div class="flex items-center gap-2" @click.stop>
+                        <!-- Status Badge with Icon -->
+                        <span v-if="getBudgetCurrentPeriod(budget)" :class="getStatusBadgeClass(getBudgetCurrentPeriod(budget)?.status || 'within')">
+                            {{ getStatusIcon(getBudgetCurrentPeriod(budget)?.status || 'within') }}
+                            {{ getStatusLabel(getBudgetCurrentPeriod(budget)?.status || 'within') }}
                         </span>
-                        <!-- Actions -->
-                        <div class="flex items-center gap-1">
-                            <button 
-                                @click.stop="openEditModal(budget)"
-                                class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                                title="Editar"
-                            >
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                            </button>
-                            <button 
-                                @click.stop="confirmDelete(budget)"
-                                class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                                title="Remover"
-                            >
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
-                        </div>
+                        <!-- Pause/Resume button -->
+                        <button 
+                            v-if="budget.status === 'active'" 
+                            @click="pauseGeneralBudgetById(budget.id)" 
+                            class="p-2 text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 rounded-lg"
+                            title="Pausar"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </button>
+                        <button 
+                            v-else-if="budget.status === 'paused'" 
+                            @click="resumeGeneralBudgetById(budget.id)" 
+                            class="p-2 text-green-500 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg"
+                            title="Retomar"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </button>
+                        <!-- Edit button -->
+                        <button @click="openGeneralBudgetModalForEdit(budget)" class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" title="Editar">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                        <!-- Delete button -->
+                        <button @click="confirmDeleteGeneralBudget(budget)" class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg" title="Excluir">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
-
                 <!-- Progress bar -->
-                <div class="relative">
-                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div 
-                            class="h-full transition-all duration-500 ease-out rounded-full"
-                            :class="getProgressBarClass(budget.status)"
-                            :style="{ width: Math.min(budget.usage_percentage, 100) + '%' }"
-                        ></div>
-                    </div>
-                    <div class="absolute right-2 top-0 h-4 flex items-center">
-                        <span class="text-xs font-bold text-white drop-shadow" v-if="budget.usage_percentage >= 30">
-                            {{ budget.usage_percentage }}%
-                        </span>
-                    </div>
+                <div class="relative h-5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                        class="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
+                        :class="getProgressBarClass(getBudgetCurrentPeriod(budget)?.status || 'within')"
+                        :style="{ width: Math.min(getBudgetPercentage(budget), 100) + '%' }"
+                    ></div>
+                    <span class="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow" v-if="getBudgetPercentage(budget) >= 20">
+                        {{ Math.round(getBudgetPercentage(budget)) }}%
+                    </span>
                 </div>
-                <p v-if="budget.usage_percentage < 30" class="text-right text-xs text-gray-500 mt-1">
-                    {{ budget.usage_percentage }}% utilizado
-                </p>
+                <p v-if="getBudgetPercentage(budget) < 20" class="text-sm text-gray-500 mt-2 text-right">{{ Math.round(getBudgetPercentage(budget)) }}% utilizado</p>
+            </div>
 
-                <!-- Remaining value -->
-                <div class="mt-2 flex justify-between text-sm">
-                    <span class="text-gray-500 dark:text-gray-400">
-                        {{ budget.remaining_value >= 0 ? 'Restante' : 'Excedido' }}
-                    </span>
-                    <span :class="budget.remaining_value >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'">
-                        {{ formatCurrency(Math.abs(budget.remaining_value)) }}
-                    </span>
+            <!-- No General Budget for current period type -->
+            <div v-if="filteredGeneralBudgets.length === 0" class="card mb-4 border-2 border-dashed border-gray-200 dark:border-gray-700 text-center py-8">
+                <svg class="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <p class="text-gray-500 mb-3">Você ainda não tem um orçamento geral {{ periodType === 'mensal' ? 'mensal' : 'anual' }}</p>
+                <button @click="openGeneralBudgetModal" class="btn-primary btn-sm">
+                    + Criar Orçamento {{ periodType === 'mensal' ? 'Mensal' : 'Anual' }}
+                </button>
+            </div>
+        </section>
+
+
+        <!-- ============ SEÇÃO 2: ORÇAMENTOS POR CATEGORIA ============ -->
+        <!-- Only shown when periodType is mensal (categories are monthly only) -->
+        <section v-if="periodType === 'mensal'" class="mt-8">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        Orçamentos por Categoria
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Limites de gasto por tipo de despesa</p>
+                </div>
+                <button @click="openCreateModal" class="btn-secondary btn-sm">
+                    + Nova Categoria
+                </button>
+            </div>
+
+            <!-- Totals summary (Category Budgets) -->
+            <div v-if="totals && budgets.length > 0" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="card text-center">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Total Orçado</p>
+                    <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatCurrency(totals.limit) }}</p>
+                </div>
+                <div class="card text-center">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Total Consumido</p>
+                    <p class="text-xl font-bold text-red-600">{{ formatCurrency(totals.consumed) }}</p>
+                </div>
+                <div class="card text-center">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Disponível</p>
+                    <p :class="['text-xl font-bold', totals.remaining >= 0 ? 'text-green-600' : 'text-red-600']">
+                        {{ formatCurrency(totals.remaining) }}
+                    </p>
+                </div>
+                <div class="card text-center">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Uso Geral</p>
+                    <p :class="['text-xl font-bold', getPercentageColor(totals.percentage)]">{{ totals.percentage }}%</p>
                 </div>
             </div>
+
+            <!-- Loading -->
+            <div v-if="loading" class="flex justify-center py-12">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+            </div>
+
+            <!-- Empty state -->
+            <div v-else-if="budgets.length === 0" class="card text-center py-12 border-2 border-dashed border-gray-200 dark:border-gray-700">
+                <svg class="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    Nenhum orçamento por categoria definido
+                </h3>
+                <p class="text-gray-500 dark:text-gray-400 mb-4">
+                    Defina limites específicos para cada tipo de despesa.
+                </p>
+                <button @click="openCreateModal" class="btn btn-primary">
+                    Criar Primeiro Orçamento por Categoria
+                </button>
+            </div>
+
+            <!-- Budgets list -->
+            <div v-else class="space-y-4">
+                <div 
+                    v-for="budget in budgets" 
+                    :key="budget.id"
+                    class="card hover:shadow-md transition-shadow cursor-pointer"
+                    @click="openCategoryBudgetHistoryModal(budget)"
+                >
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <!-- Category icon -->
+                            <div 
+                                class="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg"
+                                :style="{ backgroundColor: budget.category?.color || '#6B7280' }"
+                            >
+                                {{ budget.category?.icon || '📊' }}
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-900 dark:text-white">
+                                    {{ budget.category?.name || 'Categoria' }}
+                                </h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">
+                                    {{ formatCurrency(budget.consumed_value) }} de {{ formatCurrency(budget.limit_value) }}
+                                    <span class="text-xs text-gray-400 ml-1">• Orçamento mensal</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <!-- Status badge with icon -->
+                            <span :class="getStatusBadgeClass(budget.status)">
+                                {{ getStatusIcon(budget.status) }}
+                                {{ getStatusLabel(budget.status) }}
+                            </span>
+                            <!-- Actions -->
+                            <div class="flex items-center gap-1">
+                                <button 
+                                    @click.stop="openEditModal(budget)"
+                                    class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                                    title="Editar"
+                                >
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </button>
+                                <button 
+                                    @click.stop="confirmDelete(budget)"
+                                    class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                                    title="Remover"
+                                >
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress bar -->
+                    <div class="relative">
+                        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div 
+                                class="h-full transition-all duration-500 ease-out rounded-full"
+                                :class="getProgressBarClass(budget.status)"
+                                :style="{ width: Math.min(budget.usage_percentage, 100) + '%' }"
+                            ></div>
+                        </div>
+                        <div class="absolute right-2 top-0 h-4 flex items-center">
+                            <span class="text-xs font-bold text-white drop-shadow" v-if="budget.usage_percentage >= 30">
+                                {{ budget.usage_percentage }}%
+                            </span>
+                        </div>
+                    </div>
+                    <p v-if="budget.usage_percentage < 30" class="text-right text-xs text-gray-500 mt-1">
+                        {{ budget.usage_percentage }}% utilizado
+                    </p>
+
+                    <!-- Remaining value -->
+                    <div class="mt-2 flex justify-between text-sm">
+                        <span class="text-gray-500 dark:text-gray-400">
+                            {{ budget.remaining_value >= 0 ? 'Restante' : 'Excedido' }}
+                        </span>
+                        <span :class="budget.remaining_value >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'">
+                            {{ formatCurrency(Math.abs(budget.remaining_value)) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Message when viewing Anual mode - no category budgets available -->
+        <div v-if="periodType === 'anual'" class="card text-center py-8 mt-4 border-2 border-dashed border-gray-200 dark:border-gray-700">
+            <svg class="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-gray-500">Orçamentos por categoria são apenas mensais.</p>
+            <p class="text-sm text-gray-400 mt-1">Alterne para o modo Mensal para visualizá-los.</p>
         </div>
 
         <!-- Create/Edit Modal -->
@@ -447,12 +494,17 @@
                         </div>
                     </div>
 
-                    <!-- Include all categories -->
-                    <div class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                        <input type="checkbox" v-model="generalBudgetForm.include_future_categories" id="include_future" class="w-4 h-4" />
-                        <label for="include_future" class="text-sm text-gray-700 dark:text-gray-300">
-                            Incluir automaticamente novas categorias
-                        </label>
+                    <!-- Info box about limitation -->
+                    <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                        <p class="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                            <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>
+                                <strong>Orçamento Geral</strong> soma <em>todos</em> os seus gastos, independente de categoria.
+                                Você pode ter apenas 1 mensal e 1 anual ativos.
+                            </span>
+                        </p>
                     </div>
 
                     <!-- Actions -->
@@ -708,28 +760,54 @@ const totals = computed(() => budgetsStore.totals);
 const generalBudgets = ref([]);
 const selectedGeneralBudget = ref(null); // For editing/viewing
 
-// General Budget helper functions
-function getGeneralBudgetStatusClass(status) {
-    const classes = {
-        within: 'badge badge-green',
-        warning: 'badge badge-yellow',
-        exceeded: 'badge badge-red',
+// Computed: Filter general budgets by current period type selection
+const filteredGeneralBudgets = computed(() => {
+    const type = periodType.value === 'mensal' ? 'monthly' : 'yearly';
+    return generalBudgets.value.filter(b => b.period_type === type);
+});
+
+// Computed: Check if we already have a general budget for the current period type
+const hasGeneralBudgetForCurrentPeriod = computed(() => {
+    return filteredGeneralBudgets.value.length > 0;
+});
+
+// ========== STATUS HELPER FUNCTIONS ==========
+// Unified status functions with icons for better UX
+
+function getStatusIcon(status) {
+    const icons = {
+        within: '✓',
+        ok: '✓',
+        warning: '⚠️',
+        exceeded: '🔴',
     };
-    return classes[status] || 'badge';
+    return icons[status] || '✓';
 }
 
-function getGeneralBudgetStatusLabel(status) {
+function getStatusLabel(status) {
     const labels = {
         within: 'Dentro do limite',
+        ok: 'Dentro do limite',
         warning: 'Atenção',
         exceeded: 'Estourado',
     };
-    return labels[status] || status;
+    return labels[status] || 'OK';
 }
 
-function getGeneralProgressBarClass(status) {
+function getStatusBadgeClass(status) {
+    const classes = {
+        within: 'badge badge-green',
+        ok: 'badge badge-green',
+        warning: 'badge badge-yellow',
+        exceeded: 'badge badge-red',
+    };
+    return classes[status] || 'badge badge-green';
+}
+
+function getProgressBarClass(status) {
     const classes = {
         within: 'bg-green-500',
+        ok: 'bg-green-500',
         warning: 'bg-yellow-500',
         exceeded: 'bg-red-500',
     };
@@ -1081,32 +1159,7 @@ function formatCurrency(value) {
     }).format(value || 0);
 }
 
-function getStatusLabel(status) {
-    const labels = {
-        ok: 'Dentro do limite',
-        warning: 'Atenção',
-        exceeded: 'Excedido',
-    };
-    return labels[status] || status;
-}
-
-function getStatusBadgeClass(status) {
-    const classes = {
-        ok: 'badge badge-green',
-        warning: 'badge badge-yellow',
-        exceeded: 'badge badge-red',
-    };
-    return classes[status] || 'badge';
-}
-
-function getProgressBarClass(status) {
-    const classes = {
-        ok: 'bg-green-500',
-        warning: 'bg-yellow-500',
-        exceeded: 'bg-red-500',
-    };
-    return classes[status] || 'bg-gray-500';
-}
+// Note: getStatusLabel, getStatusBadgeClass, getProgressBarClass are defined earlier (consolidated)
 
 function getPercentageColor(percentage) {
     if (percentage >= 100) return 'text-red-600';
