@@ -6,12 +6,12 @@
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
         </div>
 
-        <div v-else-if="!hasData" class="h-64 flex flex-col items-center justify-center text-gray-400">
+        <div v-else-if="!hasData" class="h-64 flex flex-col items-center justify-center text-gray-400 text-center px-4">
             <svg class="w-12 h-12 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <p>Sem parcelas futuras</p>
-            <p class="text-sm mt-1">Você não tem compras parceladas a vencer.</p>
+            <p class="font-medium">Nenhum compromisso futuro registrado</p>
+            <p class="text-sm mt-1">Você não tem parcelas ou compras parceladas a vencer nos próximos meses.</p>
         </div>
 
         <div v-else class="h-64">

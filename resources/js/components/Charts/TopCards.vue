@@ -6,11 +6,12 @@
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
         </div>
 
-        <div v-else-if="!hasData" class="h-64 flex flex-col items-center justify-center text-gray-400">
+        <div v-else-if="!hasData" class="h-64 flex flex-col items-center justify-center text-gray-400 text-center px-4">
             <svg class="w-12 h-12 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
             </svg>
-            <p>Nenhum uso de cartão registrado</p>
+            <p class="font-medium">Sem gastos em cartões no período</p>
+            <p class="text-sm mt-1">Registre despesas no cartão para visualizar o ranking.</p>
         </div>
 
         <div v-else class="h-64">
@@ -33,15 +34,18 @@ const loading = ref(false);
 const rawData = ref([]);
 
 const hasData = computed(() => {
-    return rawData.value && rawData.value.length > 0;
+    return rawData.value && rawData.value.length > 0 && rawData.value.some(item => item.total_spent > 0);
 });
 
+const colors = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981'];
+
 const chartData = computed(() => {
+    const filtered = rawData.value.filter(item => item.total_spent > 0);
     return {
-        labels: rawData.value.map(item => item.name),
+        labels: filtered.map(item => item.name),
         datasets: [{
-            data: rawData.value.map(item => item.total),
-            backgroundColor: rawData.value.map(item => item.color),
+            data: filtered.map(item => item.total_spent),
+            backgroundColor: filtered.map((_, i) => colors[i % colors.length]),
             borderWidth: 0,
             hoverOffset: 4
         }]

@@ -6,11 +6,12 @@
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
         </div>
 
-        <div v-else-if="!hasData" class="h-64 flex flex-col items-center justify-center text-gray-400">
+        <div v-else-if="!hasData" class="h-64 flex flex-col items-center justify-center text-gray-400 text-center px-4">
             <svg class="w-12 h-12 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <p>Nenhum orçamento definido para este mês</p>
+            <p class="font-medium">Defina um orçamento mensal</p>
+            <p class="text-sm mt-1">Configure orçamentos por categoria para acompanhar o planejamento neste período.</p>
         </div>
 
         <div v-else class="h-64">

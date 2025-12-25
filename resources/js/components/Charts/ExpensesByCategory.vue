@@ -9,11 +9,12 @@
             </svg>
         </div>
 
-        <div v-else-if="!hasData" class="flex-1 flex flex-col items-center justify-center min-h-[300px] text-gray-500">
+        <div v-else-if="!hasData" class="flex-1 flex flex-col items-center justify-center min-h-[300px] text-gray-500 text-center px-4">
             <svg class="w-12 h-12 mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
             </svg>
-            <p>Sem dados para o período</p>
+            <p class="font-medium">Sem despesas no período</p>
+            <p class="text-sm text-gray-400 mt-1">Registre despesas para visualizar a distribuição por categoria.</p>
         </div>
 
         <div v-else class="flex-1 min-h-[300px]">

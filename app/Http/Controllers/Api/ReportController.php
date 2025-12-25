@@ -335,15 +335,14 @@ class ReportController extends Controller
     }
 
     /**
-     * Get monthly evolution data for charts.
+     * Get monthly evolution data for charts (Income vs Expenses + Balance Evolution).
+     * Returns receita, despesa, and accumulated_balance for each month.
      */
     public function monthlyEvolution(Request $request)
     {
         $userId = Auth::id();
-        $type = $request->input('type', 'despesa');
 
-        $query = Transaction::where('user_id', $userId)
-            ->where('type', $type);
+        $query = Transaction::where('user_id', $userId);
 
         if ($request->filled('date_from')) {
             $query->where('date', '>=', $request->date_from);
@@ -351,20 +350,45 @@ class ReportController extends Controller
         if ($request->filled('date_to')) {
             $query->where('date', '<=', $request->date_to);
         }
+        if ($request->filled('account_id')) {
+            $query->where('account_id', $request->account_id);
+        }
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
 
         $transactions = $query->get();
 
+        // Group by month
         $grouped = $transactions->groupBy(function ($item) {
             return Carbon::parse($item->date)->format('Y-m');
-        })->map(function ($group, $month) {
-            return [
-                'month' => $month,
-                'label' => Carbon::createFromFormat('Y-m', $month)->translatedFormat('M/Y'),
-                'total' => $group->sum('value'),
-            ];
-        })->sortKeys()->values();
+        });
 
-        return response()->json(['data' => $grouped]);
+        // Calculate per month with accumulated balance
+        $result = [];
+        $accumulatedBalance = 0;
+
+        // Sort months chronologically
+        $months = $grouped->keys()->sort();
+
+        foreach ($months as $month) {
+            $monthTransactions = $grouped[$month];
+
+            $receita = $monthTransactions->where('type', 'receita')->sum('value');
+            $despesa = $monthTransactions->where('type', 'despesa')->sum('value');
+            $monthBalance = $receita - $despesa;
+            $accumulatedBalance += $monthBalance;
+
+            $result[] = [
+                'month' => Carbon::createFromFormat('Y-m', $month)->translatedFormat('M/Y'),
+                'receita' => $receita,
+                'despesa' => $despesa,
+                'balance' => $monthBalance,
+                'accumulated_balance' => $accumulatedBalance,
+            ];
+        }
+
+        return response()->json(['data' => $result]);
     }
 
     /**
@@ -454,33 +478,59 @@ class ReportController extends Controller
     }
 
     /**
-     * Get future commitment data.
+     * Get future commitment data (installments to pay in future months).
      */
     public function futureCommitment(Request $request)
     {
         $userId = Auth::id();
-        $nextMonths = 3;
-        $data = [];
+        $today = Carbon::now();
+        $endDate = Carbon::now()->addMonths(6)->endOfMonth();
 
-        for ($i = 0; $i < $nextMonths; $i++) {
-            $date = Carbon::now()->addMonths($i);
-            $monthKey = $date->format('Y-m');
+        // Get future installment transactions
+        $futureInstallments = Transaction::where('user_id', $userId)
+            ->where('type', 'despesa')
+            ->where('is_installment', true)
+            ->where('date', '>', $today->format('Y-m-d'))
+            ->where('date', '<=', $endDate->format('Y-m-d'))
+            ->get();
 
-            // Get recurring transactions for this month
-            $recurring = \App\Models\RecurringTransaction::where('user_id', $userId)
-                ->where('status', 'active')
-                ->where('type', 'despesa')
-                ->get()
-                ->sum('value');
+        // Also get credit card future transactions
+        $futureCardTransactions = Transaction::where('user_id', $userId)
+            ->where('type', 'despesa')
+            ->whereNotNull('card_id')
+            ->where('date', '>', $today->format('Y-m-d'))
+            ->where('date', '<=', $endDate->format('Y-m-d'))
+            ->get();
 
-            $data[] = [
-                'month' => $monthKey,
-                'label' => $date->translatedFormat('M/Y'),
-                'total' => $recurring,
-            ];
+        // Combine and group by month
+        $allFuture = $futureInstallments->merge($futureCardTransactions)->unique('id');
+
+        $grouped = $allFuture->groupBy(function ($item) {
+            return Carbon::parse($item->date)->format('Y-m');
+        });
+
+        $result = [];
+        $currentMonth = Carbon::now()->startOfMonth();
+
+        for ($i = 0; $i < 6; $i++) {
+            $month = $currentMonth->copy()->addMonths($i);
+            $monthKey = $month->format('Y-m');
+
+            $total = 0;
+            if (isset($grouped[$monthKey])) {
+                $total = $grouped[$monthKey]->sum('value');
+            }
+
+            if ($total > 0 || $i < 3) { // Always show at least 3 months
+                $result[] = [
+                    'month' => $monthKey,
+                    'label' => $month->translatedFormat('M/Y'),
+                    'total' => $total,
+                ];
+            }
         }
 
-        return response()->json(['data' => $data]);
+        return response()->json(['data' => $result]);
     }
 
     /**
@@ -517,49 +567,24 @@ class ReportController extends Controller
     }
 
     /**
-     * Get budget vs actual spending.
+     * Get budget vs actual spending (totals for bar chart).
      */
     public function budgetVsActual(Request $request)
     {
         $userId = Auth::id();
-        $month = $request->input('month', Carbon::now()->format('Y-m'));
+
+        // Extract month from date_from filter or use current month
+        $month = Carbon::now()->format('Y-m');
+        if ($request->filled('date_from')) {
+            $month = Carbon::parse($request->date_from)->format('Y-m');
+        }
 
         $budgets = \App\Models\Budget::where('user_id', $userId)
             ->with('category')
             ->get();
 
-        $data = $budgets->map(function ($budget) use ($month) {
-            $spent = Transaction::where('user_id', $budget->user_id)
-                ->where('category_id', $budget->category_id)
-                ->where('type', 'despesa')
-                ->whereRaw("strftime('%Y-%m', date) = ?", [$month])
-                ->sum('value');
-
-            return [
-                'category' => $budget->category?->name ?? 'Sem categoria',
-                'color' => $budget->category?->color ?? '#6b7280',
-                'budget' => $budget->amount,
-                'spent' => $spent,
-                'remaining' => $budget->amount - $spent,
-                'percentage' => $budget->amount > 0 ? round(($spent / $budget->amount) * 100, 1) : 0,
-            ];
-        });
-
-        return response()->json(['data' => $data]);
-    }
-
-    /**
-     * Get budget consumption for donut chart.
-     */
-    public function budgetConsumption(Request $request)
-    {
-        $userId = Auth::id();
-        $month = $request->input('month', Carbon::now()->format('Y-m'));
-
-        $budgets = \App\Models\Budget::where('user_id', $userId)->get();
-
-        $totalBudget = $budgets->sum('amount');
-        $totalSpent = 0;
+        $totalBudgeted = $budgets->sum('amount');
+        $totalActual = 0;
 
         foreach ($budgets as $budget) {
             $spent = Transaction::where('user_id', $userId)
@@ -567,17 +592,57 @@ class ReportController extends Controller
                 ->where('type', 'despesa')
                 ->whereRaw("strftime('%Y-%m', date) = ?", [$month])
                 ->sum('value');
-            $totalSpent += $spent;
+            $totalActual += $spent;
         }
 
         return response()->json([
             'data' => [
-                'total_budget' => $totalBudget,
-                'total_spent' => $totalSpent,
-                'remaining' => $totalBudget - $totalSpent,
-                'percentage' => $totalBudget > 0 ? round(($totalSpent / $totalBudget) * 100, 1) : 0,
+                'budgeted' => $totalBudgeted,
+                'actual' => $totalActual,
+                'remaining' => $totalBudgeted - $totalActual,
+                'percentage' => $totalBudgeted > 0 ? round(($totalActual / $totalBudgeted) * 100, 1) : 0,
             ]
         ]);
+    }
+
+    /**
+     * Get budget consumption for donut chart (per category).
+     */
+    public function budgetConsumption(Request $request)
+    {
+        $userId = Auth::id();
+
+        // Extract month from date_from filter or use current month
+        $month = Carbon::now()->format('Y-m');
+        if ($request->filled('date_from')) {
+            $month = Carbon::parse($request->date_from)->format('Y-m');
+        }
+
+        $budgets = \App\Models\Budget::where('user_id', $userId)
+            ->with('category')
+            ->get();
+
+        $result = [];
+
+        foreach ($budgets as $budget) {
+            $spent = Transaction::where('user_id', $userId)
+                ->where('category_id', $budget->category_id)
+                ->where('type', 'despesa')
+                ->whereRaw("strftime('%Y-%m', date) = ?", [$month])
+                ->sum('value');
+
+            if ($spent > 0) {
+                $result[] = [
+                    'category' => $budget->category?->name ?? 'Sem categoria',
+                    'color' => $budget->category?->color ?? '#6b7280',
+                    'consumed' => $spent,
+                    'budget' => $budget->amount,
+                    'percentage' => $budget->amount > 0 ? round(($spent / $budget->amount) * 100, 1) : 0,
+                ];
+            }
+        }
+
+        return response()->json(['data' => $result]);
     }
 
     /**
@@ -605,10 +670,12 @@ class ReportController extends Controller
 
             if ($percentage >= 80) {
                 $alerts[] = [
+                    'id' => $budget->id,
                     'category' => $budget->category?->name ?? 'Sem categoria',
                     'color' => $budget->category?->color ?? '#6b7280',
                     'budget' => $budget->amount,
                     'spent' => $spent,
+                    'remaining' => $budget->amount - $spent,
                     'percentage' => round($percentage, 1),
                     'status' => $percentage >= 100 ? 'exceeded' : 'warning',
                 ];
