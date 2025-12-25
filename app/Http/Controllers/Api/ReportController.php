@@ -262,4 +262,386 @@ class ReportController extends Controller
 
         return $methods[$method] ?? ($method ?? '-');
     }
+
+    /**
+     * Get transactions by category for charts.
+     */
+    public function byCategory(Request $request)
+    {
+        $userId = Auth::id();
+        $query = Transaction::where('user_id', $userId)
+            ->with('category');
+
+        if ($request->filled('date_from')) {
+            $query->where('date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->where('date', '<=', $request->date_to);
+        }
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+        if ($request->filled('account_id')) {
+            $query->where('account_id', $request->account_id);
+        }
+
+        $transactions = $query->get();
+
+        $grouped = $transactions->groupBy('category_id')->map(function ($group) {
+            $category = $group->first()->category;
+            return [
+                'category_id' => $category?->id,
+                'name' => $category?->name ?? 'Sem categoria',
+                'color' => $category?->color ?? '#6b7280',
+                'total' => $group->sum('value'),
+            ];
+        })->sortByDesc('total')->values();
+
+        return response()->json(['data' => $grouped]);
+    }
+
+    /**
+     * Get transactions by account for charts.
+     */
+    public function byAccount(Request $request)
+    {
+        $userId = Auth::id();
+        $query = Transaction::where('user_id', $userId)
+            ->with('account');
+
+        if ($request->filled('date_from')) {
+            $query->where('date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->where('date', '<=', $request->date_to);
+        }
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
+        $transactions = $query->get();
+
+        $grouped = $transactions->groupBy('account_id')->map(function ($group) {
+            $account = $group->first()->account;
+            return [
+                'account_id' => $account?->id,
+                'name' => $account?->name ?? 'Sem conta',
+                'color' => $account?->color ?? '#6b7280',
+                'total' => $group->sum('value'),
+            ];
+        })->sortByDesc('total')->values();
+
+        return response()->json(['data' => $grouped]);
+    }
+
+    /**
+     * Get monthly evolution data for charts.
+     */
+    public function monthlyEvolution(Request $request)
+    {
+        $userId = Auth::id();
+        $type = $request->input('type', 'despesa');
+
+        $query = Transaction::where('user_id', $userId)
+            ->where('type', $type);
+
+        if ($request->filled('date_from')) {
+            $query->where('date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->where('date', '<=', $request->date_to);
+        }
+
+        $transactions = $query->get();
+
+        $grouped = $transactions->groupBy(function ($item) {
+            return Carbon::parse($item->date)->format('Y-m');
+        })->map(function ($group, $month) {
+            return [
+                'month' => $month,
+                'label' => Carbon::createFromFormat('Y-m', $month)->translatedFormat('M/Y'),
+                'total' => $group->sum('value'),
+            ];
+        })->sortKeys()->values();
+
+        return response()->json(['data' => $grouped]);
+    }
+
+    /**
+     * Calculate savings rate.
+     */
+    public function savingsRate(Request $request)
+    {
+        $userId = Auth::id();
+        $query = Transaction::where('user_id', $userId);
+
+        if ($request->filled('date_from')) {
+            $query->where('date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->where('date', '<=', $request->date_to);
+        }
+
+        $transactions = $query->get();
+
+        $income = $transactions->where('type', 'receita')->sum('value');
+        $expenses = $transactions->where('type', 'despesa')->sum('value');
+        $savings = $income - $expenses;
+        $rate = $income > 0 ? ($savings / $income) * 100 : 0;
+
+        return response()->json([
+            'data' => [
+                'income' => $income,
+                'expenses' => $expenses,
+                'savings' => $savings,
+                'rate' => round($rate, 1),
+            ]
+        ]);
+    }
+
+    /**
+     * Get fixed vs variable expenses.
+     */
+    public function fixedVsVariable(Request $request)
+    {
+        $userId = Auth::id();
+        $query = Transaction::where('user_id', $userId)
+            ->where('type', 'despesa');
+
+        if ($request->filled('date_from')) {
+            $query->where('date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->where('date', '<=', $request->date_to);
+        }
+
+        $transactions = $query->get();
+
+        $fixed = $transactions->whereNotNull('recurring_transaction_id')->sum('value');
+        $variable = $transactions->whereNull('recurring_transaction_id')->sum('value');
+        $total = $fixed + $variable;
+
+        return response()->json([
+            'data' => [
+                'fixed' => $fixed,
+                'variable' => $variable,
+                'fixed_pct' => $total > 0 ? round(($fixed / $total) * 100, 1) : 0,
+                'variable_pct' => $total > 0 ? round(($variable / $total) * 100, 1) : 0,
+            ]
+        ]);
+    }
+
+    /**
+     * Get credit limit evolution.
+     */
+    public function creditLimitEvolution(Request $request)
+    {
+        $userId = Auth::id();
+        $cards = \App\Models\Card::where('user_id', $userId)
+            ->where('is_archived', false)
+            ->get();
+
+        $data = $cards->map(function ($card) {
+            return [
+                'name' => $card->name,
+                'limit' => $card->limit,
+                'used' => $card->limit - $card->available_limit,
+                'available' => $card->available_limit,
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Get future commitment data.
+     */
+    public function futureCommitment(Request $request)
+    {
+        $userId = Auth::id();
+        $nextMonths = 3;
+        $data = [];
+
+        for ($i = 0; $i < $nextMonths; $i++) {
+            $date = Carbon::now()->addMonths($i);
+            $monthKey = $date->format('Y-m');
+
+            // Get recurring transactions for this month
+            $recurring = \App\Models\RecurringTransaction::where('user_id', $userId)
+                ->where('status', 'active')
+                ->where('type', 'despesa')
+                ->get()
+                ->sum('value');
+
+            $data[] = [
+                'month' => $monthKey,
+                'label' => $date->translatedFormat('M/Y'),
+                'total' => $recurring,
+            ];
+        }
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Get top cards by spending.
+     */
+    public function topCards(Request $request)
+    {
+        $userId = Auth::id();
+        $startDate = $request->input('date_from', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $endDate = $request->input('date_to', Carbon::now()->endOfMonth()->format('Y-m-d'));
+
+        $cards = \App\Models\Card::where('user_id', $userId)
+            ->where('is_archived', false)
+            ->withSum([
+                'transactions as total_spent' => function ($query) use ($startDate, $endDate) {
+                    $query->where('type', 'despesa')
+                        ->whereBetween('date', [$startDate, $endDate]);
+                }
+            ], 'value')
+            ->orderByDesc('total_spent')
+            ->take(5)
+            ->get();
+
+        $data = $cards->map(function ($card) {
+            return [
+                'id' => $card->id,
+                'name' => $card->name,
+                'brand' => $card->brand,
+                'total_spent' => $card->total_spent ?? 0,
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Get budget vs actual spending.
+     */
+    public function budgetVsActual(Request $request)
+    {
+        $userId = Auth::id();
+        $month = $request->input('month', Carbon::now()->format('Y-m'));
+
+        $budgets = \App\Models\Budget::where('user_id', $userId)
+            ->with('category')
+            ->get();
+
+        $data = $budgets->map(function ($budget) use ($month) {
+            $spent = Transaction::where('user_id', $budget->user_id)
+                ->where('category_id', $budget->category_id)
+                ->where('type', 'despesa')
+                ->whereRaw("strftime('%Y-%m', date) = ?", [$month])
+                ->sum('value');
+
+            return [
+                'category' => $budget->category?->name ?? 'Sem categoria',
+                'color' => $budget->category?->color ?? '#6b7280',
+                'budget' => $budget->amount,
+                'spent' => $spent,
+                'remaining' => $budget->amount - $spent,
+                'percentage' => $budget->amount > 0 ? round(($spent / $budget->amount) * 100, 1) : 0,
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Get budget consumption for donut chart.
+     */
+    public function budgetConsumption(Request $request)
+    {
+        $userId = Auth::id();
+        $month = $request->input('month', Carbon::now()->format('Y-m'));
+
+        $budgets = \App\Models\Budget::where('user_id', $userId)->get();
+
+        $totalBudget = $budgets->sum('amount');
+        $totalSpent = 0;
+
+        foreach ($budgets as $budget) {
+            $spent = Transaction::where('user_id', $userId)
+                ->where('category_id', $budget->category_id)
+                ->where('type', 'despesa')
+                ->whereRaw("strftime('%Y-%m', date) = ?", [$month])
+                ->sum('value');
+            $totalSpent += $spent;
+        }
+
+        return response()->json([
+            'data' => [
+                'total_budget' => $totalBudget,
+                'total_spent' => $totalSpent,
+                'remaining' => $totalBudget - $totalSpent,
+                'percentage' => $totalBudget > 0 ? round(($totalSpent / $totalBudget) * 100, 1) : 0,
+            ]
+        ]);
+    }
+
+    /**
+     * Get budget alerts.
+     */
+    public function budgetAlerts(Request $request)
+    {
+        $userId = Auth::id();
+        $month = Carbon::now()->format('Y-m');
+
+        $budgets = \App\Models\Budget::where('user_id', $userId)
+            ->with('category')
+            ->get();
+
+        $alerts = [];
+
+        foreach ($budgets as $budget) {
+            $spent = Transaction::where('user_id', $userId)
+                ->where('category_id', $budget->category_id)
+                ->where('type', 'despesa')
+                ->whereRaw("strftime('%Y-%m', date) = ?", [$month])
+                ->sum('value');
+
+            $percentage = $budget->amount > 0 ? ($spent / $budget->amount) * 100 : 0;
+
+            if ($percentage >= 80) {
+                $alerts[] = [
+                    'category' => $budget->category?->name ?? 'Sem categoria',
+                    'color' => $budget->category?->color ?? '#6b7280',
+                    'budget' => $budget->amount,
+                    'spent' => $spent,
+                    'percentage' => round($percentage, 1),
+                    'status' => $percentage >= 100 ? 'exceeded' : 'warning',
+                ];
+            }
+        }
+
+        return response()->json(['data' => $alerts]);
+    }
+
+    /**
+     * Get goals progress.
+     */
+    public function goalsProgress(Request $request)
+    {
+        $userId = Auth::id();
+
+        $goals = \App\Models\Goal::where('user_id', $userId)
+            ->where('status', 'em_andamento')
+            ->get();
+
+        $data = $goals->map(function ($goal) {
+            return [
+                'id' => $goal->id,
+                'name' => $goal->name,
+                'icon' => $goal->icon,
+                'color' => $goal->color,
+                'target' => $goal->target_value,
+                'current' => $goal->current_value,
+                'percentage' => $goal->progress_percentage,
+                'remaining' => $goal->remaining_value,
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
 }

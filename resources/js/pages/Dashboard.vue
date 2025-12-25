@@ -29,7 +29,6 @@
                     title="Saldo Atual"
                     :value="formatCurrency(stats.totalBalance)"
                     icon="wallet"
-                    :trend="stats.balanceTrend"
                     color="primary"
                     clickable
                 />
