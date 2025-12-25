@@ -256,9 +256,9 @@ class ReportController extends Controller
     {
         $methods = [
             'pix' => 'PIX',
-            'debit' => 'Débito',
-            'credit' => 'Crédito',
-            'transfer' => 'Transferência',
+            'debito' => 'Débito',
+            'credito' => 'Crédito',
+            'transferencia' => 'Transferência',
             'boleto' => 'Boleto',
             'dinheiro' => 'Dinheiro',
         ];

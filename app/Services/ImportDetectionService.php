@@ -24,7 +24,7 @@ class ImportDetectionService
     // Payment methods valid for OFX bank statement import (no credit card here)
     private array $paymentMethodPatterns = [
         'pix' => ['pix', 'chave pix', 'pix recebido', 'pix enviado'],
-        'debit' => ['débito', 'debito', 'via débito', 'via debito', 'compra no débito', 'compra débito', 'nu pay', 'nupay', 'pagamento de fatura'],
+        'debito' => ['débito', 'debito', 'via débito', 'via debito', 'compra no débito', 'compra débito', 'nu pay', 'nupay', 'pagamento de fatura'],
     ];
 
     // Patterns for matching category names in database
@@ -196,7 +196,7 @@ class ImportDetectionService
     private function detectCard(string $description, ?string $paymentMethod): ?int
     {
         // In OFX context, only debit cards are relevant (no credit card transactions)
-        if ($paymentMethod !== 'debit') {
+        if ($paymentMethod !== 'debito') {
             return null;
         }
 
@@ -290,7 +290,7 @@ class ImportDetectionService
     {
         return [
             'pix' => 'PIX',
-            'debit' => 'Débito',
+            'debito' => 'Débito',
         ];
     }
 }

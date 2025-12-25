@@ -223,6 +223,12 @@ class BackupImportService
             $oldRecurringId = $data['recurring_transaction_id'] ?? null;
             unset($data['id'], $data['created_at']);
 
+            // Sanitize payment_method for PostgreSQL compatibility
+            // Convert legacy English values to Portuguese
+            if (isset($data['payment_method'])) {
+                $data['payment_method'] = $this->sanitizePaymentMethod($data['payment_method']);
+            }
+
             $transaction = Transaction::create([
                 ...$data,
                 'user_id' => $userId,
@@ -235,6 +241,28 @@ class BackupImportService
 
             $this->idMaps['transactions'][$oldId] = $transaction->id;
         }
+    }
+
+    /**
+     * Sanitize payment_method to ensure PostgreSQL check constraint compatibility.
+     * Converts legacy English values to Portuguese equivalents.
+     */
+    private function sanitizePaymentMethod(?string $method): ?string
+    {
+        if ($method === null) {
+            return null;
+        }
+
+        // Map of legacy/English values to valid Portuguese values
+        $mapping = [
+            'debit' => 'debito',
+            'credit' => 'credito',
+            'transfer' => 'transferencia',
+            'cash' => 'dinheiro',
+            'bank_slip' => 'boleto',
+        ];
+
+        return $mapping[$method] ?? $method;
     }
 
     private function importBudgets(int $userId, array $budgets): void

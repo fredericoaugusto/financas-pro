@@ -87,7 +87,7 @@ class BackupExportService
                 'account_id' => $c->account_id,
                 'name' => $c->name,
                 'brand' => $c->brand,
-                'last_four' => $c->last_four,
+                'last_4_digits' => $c->last_4_digits,
                 'credit_limit' => $c->credit_limit,
                 'closing_day' => $c->closing_day,
                 'due_day' => $c->due_day,

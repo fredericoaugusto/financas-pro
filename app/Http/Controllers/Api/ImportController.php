@@ -75,7 +75,7 @@ class ImportController extends Controller
                 'categories' => $categories,
                 'payment_methods' => $this->detectionService->getAvailablePaymentMethods(),
                 'accounts' => Account::where('user_id', $userId)->select('id', 'name', 'bank')->get(),
-                'cards' => Card::where('user_id', $userId)->select('id', 'name', 'brand', 'last_four')->get(),
+                'cards' => Card::where('user_id', $userId)->select('id', 'name', 'brand', 'last_4_digits')->get(),
             ]);
 
         } catch (\Exception $e) {
