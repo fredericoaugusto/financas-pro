@@ -267,8 +267,8 @@ class TransactionFilterService
 
         $monthExpression = DatabaseDateHelper::monthYear('date');
         $monthlyData = $query->selectRaw("{$monthExpression} as month, type, SUM(value) as total")
-            ->groupBy('month', 'type')
-            ->orderBy('month')
+            ->groupBy(\DB::raw($monthExpression), 'type')
+            ->orderBy(\DB::raw($monthExpression))
             ->get()
             ->groupBy('month');
 
