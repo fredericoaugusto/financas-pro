@@ -77,7 +77,14 @@ class FinancialInsightsService
         });
 
         $trends = [];
-        $categoryIds = $currentData->keys()->merge($previousData->keys())->unique();
+        $categoryIds = $currentData->keys()
+            ->merge($previousData->keys())
+            ->unique()
+            ->filter(function ($id) {
+                return !empty($id);
+            })
+            ->values();
+
         $categories = Category::whereIn('id', $categoryIds)->get()->keyBy('id');
 
         foreach ($categoryIds as $catId) {
