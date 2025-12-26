@@ -39,52 +39,60 @@ class FinancialInsightsService
         $userId = Auth::id();
         $now = Carbon::now();
 
-        // Período Atual: últimos 3 meses (excluindo mês corrente incompleto para maior precisão, ou incluindo? Vamos incluir para ser realtime)
-        // O prompt diz "Comparar últimos 3 meses". Vamos pegar os últimos 3 meses completos para média estável, ou 90 dias.
-        // Vamos usar meses calendário completos para facilitar "Média mensal".
-        // Current: Last 3 months (e.g. Oct, Nov, Dec)
-        // Previous: Month -3 to -6 (e.g. Jul, Aug, Sep)
-
-        // Vamos considerar o mês atual e os 2 anteriores como "Atual" se tiver dados? 
-        // Melhor pegar últimos 3 meses fechados para tendência mais sólida, ou incluir atual.
-        // Dado que é "Inteligência", melhor incluir o mês atual pro-rata ou pegar últimos 90 dias.
-        // Simplificação: Pegar transações dos últimos 3 meses (Today - 90 days) vs (Today - 180 days to Today - 90 days).
-
+        // Período Atual: últimos 3 meses (últimos 90 dias)
+        // Período Anterior: 3 meses antes disso (90-180 dias atrás)
         $currentStart = $now->copy()->subDays(90);
         $previousStart = $now->copy()->subDays(180);
         $previousEnd = $now->copy()->subDays(90);
 
-        $currentData = Transaction::where('user_id', $userId)
-            ->includedInTotals()
+        // Fetch all recent transactions and group in PHP to avoid PostgreSQL GROUP BY issues
+        $currentTransactions = Transaction::with('account')
+            ->where('user_id', $userId)
             ->where('type', 'despesa')
             ->where('date', '>=', $currentStart)
-            ->select('category_id', DB::raw('SUM(value) as total'))
-            ->groupBy('category_id')
+            ->whereNotIn('status', ['estornada', 'cancelada'])
             ->get()
-            ->keyBy('category_id');
+            ->filter(function ($t) {
+                // Filter: include if no account or account not excluded
+                return !$t->account || !$t->account->exclude_from_totals;
+            });
 
-        $previousData = Transaction::where('user_id', $userId)
-            ->includedInTotals()
+        $previousTransactions = Transaction::with('account')
+            ->where('user_id', $userId)
             ->where('type', 'despesa')
             ->whereBetween('date', [$previousStart, $previousEnd])
-            ->select('category_id', DB::raw('SUM(value) as total'))
-            ->groupBy('category_id')
+            ->whereNotIn('status', ['estornada', 'cancelada'])
             ->get()
-            ->keyBy('category_id');
+            ->filter(function ($t) {
+                return !$t->account || !$t->account->exclude_from_totals;
+            });
+
+        // Group by category in PHP
+        $currentData = $currentTransactions->groupBy('category_id')->map(function ($txs) {
+            return $txs->sum('value');
+        });
+
+        $previousData = $previousTransactions->groupBy('category_id')->map(function ($txs) {
+            return $txs->sum('value');
+        });
 
         $trends = [];
-        $categories = Category::whereIn('id', $currentData->keys()->merge($previousData->keys()))->get()->keyBy('id');
+        $categoryIds = $currentData->keys()->merge($previousData->keys())->unique();
+        $categories = Category::whereIn('id', $categoryIds)->get()->keyBy('id');
 
-        foreach ($categories as $catId => $category) {
-            $currTotal = $currentData[$catId]->total ?? 0;
-            $prevTotal = $previousData[$catId]->total ?? 0;
+        foreach ($categoryIds as $catId) {
+            $category = $categories->get($catId);
+            if (!$category)
+                continue;
+
+            $currTotal = $currentData->get($catId, 0);
+            $prevTotal = $previousData->get($catId, 0);
 
             $currAvg = $currTotal / 3;
             $prevAvg = $prevTotal / 3;
 
             if ($prevAvg == 0) {
-                // Nova categoria ou sem dados anteriores
-                $status = 'stable'; // Ou 'new'
+                $status = 'stable';
                 $percent = 0;
             } else {
                 $percent = (($currAvg - $prevAvg) / $prevAvg) * 100;
@@ -103,7 +111,7 @@ class FinancialInsightsService
                     'current_avg' => round($currAvg, 2),
                     'previous_avg' => round($prevAvg, 2),
                     'percentage' => round($percent, 1),
-                    'status' => $status, // increased, decreased, stable
+                    'status' => $status,
                 ];
             }
         }
