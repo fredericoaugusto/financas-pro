@@ -51,6 +51,10 @@ export const useUiStore = defineStore('ui', () => {
         sidebarOpen.value = !sidebarOpen.value;
     }
 
+    function closeSidebar() {
+        sidebarOpen.value = false;
+    }
+
     function toggleDarkMode() {
         darkMode.value = !darkMode.value;
         localStorage.setItem('darkMode', darkMode.value);
@@ -71,6 +75,7 @@ export const useUiStore = defineStore('ui', () => {
         showToast,
         removeToast,
         toggleSidebar,
+        closeSidebar,
         toggleDarkMode,
     };
 });

@@ -14,7 +14,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
             </svg>
             <p class="font-medium">Sem despesas no período</p>
-            <p class="text-sm text-gray-400 mt-1">Registre despesas para visualizar a distribuição por categoria.</p>
+            <p class="text-sm text-gray-400 mt-1 break-words">Registre despesas para visualizar a distribuição por categoria.</p>
         </div>
 
         <div v-else class="flex-1 min-h-[300px]">
@@ -62,9 +62,15 @@ const chartData = computed(() => {
 const chartOptions = {
     plugins: {
         legend: {
-            position: 'right', // Legend on right for doughnut
+            position: 'bottom', // Legend on bottom for better mobile support
+            labels: {
+                boxWidth: 12,
+                padding: 15
+            }
         }
-    }
+    },
+    responsive: true,
+    maintainAspectRatio: false
 };
 
 async function fetchData() {

@@ -1,39 +1,26 @@
 <template>
     <div>
-        <div class="flex items-center justify-between mb-6">
+        <!-- Header Mobile Stacked -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Lançamentos</h1>
                 <p class="text-gray-500 dark:text-gray-400">Todas as suas transações</p>
             </div>
-            <div class="flex items-center gap-3">
-                <!-- Export Dropdown -->
-                <div class="relative" ref="exportDropdown">
-                    <button @click="showExportMenu = !showExportMenu" class="btn-secondary flex items-center gap-2" :disabled="exporting">
-                        <svg v-if="exporting" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Exportar
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    <div v-if="showExportMenu" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
-                        <button @click="exportPdf" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex items-center gap-2 rounded-t-lg">
-                            <span class="text-red-500">📄</span> Exportar PDF
-                        </button>
-                        <button @click="exportCsv" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex items-center gap-2">
-                            <span class="text-green-500">📊</span> Exportar Excel/CSV
-                        </button>
-                        <button @click="exportSummaryPdf" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex items-center gap-2 rounded-b-lg border-t border-gray-200 dark:border-gray-700">
-                            <span class="text-blue-500">📈</span> Resumo Financeiro
-                        </button>
-                    </div>
-                </div>
-                <RouterLink to="/transactions/create" class="btn-primary">
+            <!-- Actions Container with improved spacing -->
+            <div class="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 scrollbar-hide pr-6">
+                <!-- Export Button (Triggers Modal) -->
+                <button @click="showExportModal = true" class="btn-secondary flex items-center gap-2 link-shrink-0 whitespace-nowrap" :disabled="exporting">
+                    <svg v-if="exporting" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Exportar
+                </button>
+
+                <RouterLink to="/transactions/create" class="btn-primary flex-none whitespace-nowrap mr-1">
                     <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
@@ -46,10 +33,10 @@
         <!-- Filters -->
         <!-- Filters -->
         <div class="card mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                 <div>
                     <label class="label">Tipo</label>
-                    <select v-model="transactionsStore.filters.type" class="input">
+                    <select v-model="transactionsStore.filters.type" class="input w-full">
                         <option value="">Todos</option>
                         <option value="receita">Receitas</option>
                         <option value="despesa">Despesas</option>
@@ -58,7 +45,7 @@
                 </div>
                 <div>
                     <label class="label">Categoria</label>
-                    <select v-model="transactionsStore.filters.category_id" class="input">
+                    <select v-model="transactionsStore.filters.category_id" class="input w-full">
                         <option value="">Todas as categorias</option>
                         <option v-for="category in categories" :key="category.id" :value="category.id">
                             {{ category.icon }} {{ category.name }}
@@ -67,7 +54,7 @@
                 </div>
                 <div>
                     <label class="label">Conta</label>
-                    <select v-model="transactionsStore.filters.account_id" class="input">
+                    <select v-model="transactionsStore.filters.account_id" class="input w-full">
                         <option value="">Todas as contas</option>
                         <option v-for="account in accounts" :key="account.id" :value="account.id">
                             {{ account.name }}{{ account.status === 'archived' ? ' (arquivada)' : '' }}
@@ -76,7 +63,7 @@
                 </div>
                 <div>
                     <label class="label">Cartão</label>
-                    <select v-model="transactionsStore.filters.card_id" class="input">
+                    <select v-model="transactionsStore.filters.card_id" class="input w-full">
                         <option value="">Todos os cartões</option>
                         <option v-for="card in cards" :key="card.id" :value="card.id">
                             {{ card.name }}
@@ -85,18 +72,18 @@
                 </div>
                 <div>
                     <label class="label">Data inicial</label>
-                    <input type="date" v-model="transactionsStore.filters.date_from" class="input" />
+                    <input type="date" v-model="transactionsStore.filters.date_from" class="input w-full" />
                 </div>
                 <div>
                     <label class="label">Data final</label>
-                    <input type="date" v-model="transactionsStore.filters.date_to" class="input" />
+                    <input type="date" v-model="transactionsStore.filters.date_to" class="input w-full" />
                 </div>
-                <div>
+                <div class="sm:col-span-2 lg:col-span-3 xl:col-span-6">
                     <label class="label">Buscar</label>
                     <input
                         type="text"
                         v-model="transactionsStore.filters.search"
-                        class="input"
+                        class="input w-full"
                         placeholder="Descrição..."
                     />
                 </div>
@@ -126,8 +113,8 @@
             </svg>
         </div>
 
-        <div v-else-if="transactionsStore.transactions.length" class="card">
-            <div class="overflow-x-auto">
+        <div v-else-if="transactionsStore.transactions.length" class="card overflow-hidden max-w-[90vw] sm:max-w-full mx-auto">
+            <div class="overflow-x-auto w-full">
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-gray-200 dark:border-gray-700">
@@ -605,6 +592,63 @@
             @close="showAnticipateModal = false; transactionToAnticipate = null"
             @success="transactionsStore.fetchTransactions()"
         />
+        <!-- Export Modal -->
+        <Teleport to="body">
+            <div v-if="showExportModal" class="fixed inset-0 z-[60] overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" @click="showExportModal = false"></div>
+
+                    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                    <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+                        <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                            <div class="sm:flex sm:items-start">
+                                <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 sm:mx-0 sm:h-10 sm:w-10">
+                                    <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                </div>
+                                <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
+                                        Exportar Lançamentos
+                                    </h3>
+                                    <div class="mt-4 space-y-3">
+                                        <button @click="exportPdf(); showExportModal = false" class="w-full flex items-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            <span class="text-2xl mr-3">📄</span>
+                                            <div class="text-left">
+                                                <div class="font-medium text-gray-900 dark:text-white">Exportar PDF</div>
+                                                <div class="text-sm text-gray-500">Lista detalhada em formato PDF</div>
+                                            </div>
+                                        </button>
+                                        
+                                        <button @click="exportCsv(); showExportModal = false" class="w-full flex items-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            <span class="text-2xl mr-3">📊</span>
+                                            <div class="text-left">
+                                                <div class="font-medium text-gray-900 dark:text-white">Exportar Excel/CSV</div>
+                                                <div class="text-sm text-gray-500">Planilha para análise de dados</div>
+                                            </div>
+                                        </button>
+
+                                        <button @click="exportSummaryPdf(); showExportModal = false" class="w-full flex items-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            <span class="text-2xl mr-3">📈</span>
+                                            <div class="text-left">
+                                                <div class="font-medium text-gray-900 dark:text-white">Resumo Financeiro</div>
+                                                <div class="text-sm text-gray-500">Relatório consolidado</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <button type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm" @click="showExportModal = false">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
@@ -635,9 +679,7 @@ const keepInstallments = ref(1);
 const refundValue = ref(0);
 const showAnticipateModal = ref(false);
 const transactionToAnticipate = ref(null);
-
-// Export state
-const showExportMenu = ref(false);
+const showExportModal = ref(false);
 const exporting = ref(false);
 const exportDropdown = ref(null);
 

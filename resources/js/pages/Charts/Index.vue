@@ -1,72 +1,87 @@
 <template>
-    <div class="space-y-6">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gráficos</h1>
-                <p class="text-gray-500 dark:text-gray-400">Análise financeira avançada</p>
-            </div>
-            
-            <!-- Global Period Selector -->
-            <div class="flex flex-wrap gap-2">
-                 <button 
-                    @click="setPeriod('this_month')"
-                    class="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-                    :class="isPeriodActive('this_month') ? 'bg-primary-100 text-primary-700' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'"
-                >
-                    Este Mês
-                </button>
-                 <button 
-                    @click="setPeriod('last_30')"
-                    class="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-                    :class="isPeriodActive('last_30') ? 'bg-primary-100 text-primary-700' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'"
-                >
-                    Últimos 30 dias
-                </button>
-                <button 
-                    @click="setPeriod('this_year')"
-                    class="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-                    :class="isPeriodActive('this_year') ? 'bg-primary-100 text-primary-700' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'"
-                >
-                    Este Ano
-                </button>
+    <div>
+        <!-- Page header -->
+        <div class="mb-6">
+            <div class="flex flex-col gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gráficos</h1>
+                    <p class="text-gray-500 dark:text-gray-400">Análise financeira avançada</p>
+                </div>
+                
+                <!-- Global Period Selector - same style as Budgets -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div class="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-full sm:w-auto">
+                        <button 
+                            @click="setPeriod('this_month')"
+                            :class="[
+                                'flex-1 sm:flex-none px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                                isPeriodActive('this_month') 
+                                    ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm' 
+                                    : 'text-gray-500 hover:text-gray-700'
+                            ]"
+                        >
+                            Este Mês
+                        </button>
+                        <button 
+                            @click="setPeriod('last_30')"
+                            :class="[
+                                'flex-1 sm:flex-none px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                                isPeriodActive('last_30') 
+                                    ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm' 
+                                    : 'text-gray-500 hover:text-gray-700'
+                            ]"
+                        >
+                            Últimos 30 dias
+                        </button>
+                        <button 
+                            @click="setPeriod('this_year')"
+                            :class="[
+                                'flex-1 sm:flex-none px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                                isPeriodActive('this_year') 
+                                    ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm' 
+                                    : 'text-gray-500 hover:text-gray-700'
+                            ]"
+                        >
+                            Este Ano
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Filters Header (Static) -->
-        <div class="bg-gray-50 dark:bg-gray-900 pt-2 pb-4 border-b border-gray-200 dark:border-gray-800 -mx-4 px-4 sm:mx-0 sm:px-0">
+        <!-- Filters Section -->
+        <div class="bg-gray-50 dark:bg-gray-900 py-4 border-b border-gray-200 dark:border-gray-800 mb-6">
              <div class="flex flex-col gap-4">
-                 <!-- Main Filters Row -->
-                 <div class="flex flex-wrap gap-4 items-center justify-between">
-                     <div class="flex flex-wrap gap-4 items-center">
-                        <!-- Account Filter -->
-                        <select v-model="filters.account_id" class="input py-1.5 text-sm w-auto min-w-[150px]">
-                            <option value="">Todas as contas</option>
-                            <option v-for="account in accounts" :key="account.id" :value="account.id">
-                                {{ account.name }}
-                            </option>
-                        </select>
-        
-                        <!-- Category Filter -->
-                        <select v-model="filters.category_id" class="input py-1.5 text-sm w-auto min-w-[150px]">
-                            <option value="">Todas as categorias</option>
-                            <option v-for="category in categories" :key="category.id" :value="category.id">
-                                {{ category.name }}
-                            </option>
-                        </select>
-        
-                        <!-- Date Display -->
-                        <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span>{{ formatDate(filters.date_from) }} - {{ formatDate(filters.date_to) }}</span>
-                        </div>
-                     </div>
+                 <!-- Filters Row -->
+                 <div class="flex flex-col gap-3">
+                    <!-- Account Filter -->
+                    <select v-model="filters.account_id" class="input py-2 text-sm w-full">
+                        <option value="">Todas as contas</option>
+                        <option v-for="account in accounts" :key="account.id" :value="account.id">
+                            {{ account.name }}
+                        </option>
+                    </select>
+    
+                    <!-- Category Filter -->
+                    <select v-model="filters.category_id" class="input py-2 text-sm w-full">
+                        <option value="">Todas as categorias</option>
+                        <option v-for="category in categories" :key="category.id" :value="category.id">
+                            {{ category.name }}
+                        </option>
+                    </select>
+    
+                    <!-- Date Display -->
+                    <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 w-full justify-center">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span>{{ formatDate(filters.date_from) }} - {{ formatDate(filters.date_to) }}</span>
+                    </div>
 
                      <!-- Advanced Filters Toggle -->
                      <button 
                         @click="showAdvancedFilters = !showAdvancedFilters"
-                        class="text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                        class="text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1 w-full justify-center sm:justify-start"
                     >
                         <span>Filtros avançados</span>
                         <svg class="w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': showAdvancedFilters }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -76,7 +91,7 @@
                  </div>
 
                  <!-- Advanced Filters Panel -->
-                 <div v-show="showAdvancedFilters" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                 <div v-show="showAdvancedFilters" class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                     <!-- Recurrence -->
                     <div class="space-y-2">
                         <label class="text-xs font-semibold text-gray-500 uppercase">Tipo de Despesa</label>
@@ -122,23 +137,23 @@
              </div>
         </div>
 
-        <!-- Section Tabs -->
-        <div class="border-b border-gray-200 dark:border-gray-700">
-            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+        <!-- Section Tabs - same style as Budgets period toggle -->
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+            <div class="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-full sm:w-auto overflow-x-auto">
                 <button 
                     v-for="tab in tabs" 
                     :key="tab.id"
                     @click="activeTab = tab.id"
                     :class="[
+                        'flex-1 sm:flex-none px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
                         activeTab === tab.id
-                            ? 'border-primary-500 text-primary-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-                        'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm'
+                            ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
                     ]"
                 >
                     {{ tab.name }}
                 </button>
-            </nav>
+            </div>
         </div>
 
         <!-- Overview Tab -->

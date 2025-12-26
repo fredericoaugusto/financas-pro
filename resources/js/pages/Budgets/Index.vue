@@ -2,18 +2,18 @@
     <div>
         <!-- Page header -->
         <div class="mb-6">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex flex-col gap-4">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Orçamentos</h1>
                     <p class="text-gray-500 dark:text-gray-400">Controle seus gastos por categoria</p>
                 </div>
-                <div class="flex items-center gap-3">
-                <!-- Period type toggle -->
-                    <div class="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <!-- Period type toggle -->
+                    <div class="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-full sm:w-auto">
                         <button 
                             @click="setPeriodType('todos')"
                             :class="[
-                                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                                'flex-1 sm:flex-none px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
                                 periodType === 'todos' 
                                     ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm' 
                                     : 'text-gray-500 hover:text-gray-700'
@@ -24,7 +24,7 @@
                         <button 
                             @click="setPeriodType('mensal')"
                             :class="[
-                                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                                'flex-1 sm:flex-none px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
                                 periodType === 'mensal' 
                                     ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm' 
                                     : 'text-gray-500 hover:text-gray-700'
@@ -35,7 +35,7 @@
                         <button 
                             @click="setPeriodType('anual')"
                             :class="[
-                                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                                'flex-1 sm:flex-none px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
                                 periodType === 'anual' 
                                     ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm' 
                                     : 'text-gray-500 hover:text-gray-700'
@@ -51,7 +51,7 @@
                         v-model:mode="selectorMode"
                         @change="onPeriodChange"
                     />
-                    <button @click="openCreateModal" class="btn btn-primary">
+                    <button @click="openCreateModal" class="btn btn-primary w-full sm:w-auto">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
@@ -69,7 +69,7 @@
 
         <!-- ============ SEÇÃO 1: ORÇAMENTO GERAL ============ -->
         <section class="mb-8">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                 <div>
                     <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,18 +80,18 @@
                     <p class="text-sm text-gray-500 dark:text-gray-400">Controle seus gastos totais do período</p>
                 </div>
                 <!-- Buttons to create missing budget types (shown in Todos mode or specific mode) -->
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
                     <button 
                         v-if="(periodType === 'todos' || periodType === 'mensal') && missingMonthlyBudget" 
                         @click="openGeneralBudgetModalWithType('monthly')" 
-                        class="btn-secondary btn-sm"
+                        class="btn-secondary btn-sm flex-1 sm:flex-none"
                     >
                         + Criar Mensal
                     </button>
                     <button 
                         v-if="(periodType === 'todos' || periodType === 'anual') && missingYearlyBudget" 
                         @click="openGeneralBudgetModalWithType('yearly')" 
-                        class="btn-secondary btn-sm"
+                        class="btn-secondary btn-sm flex-1 sm:flex-none"
                     >
                         + Criar Anual
                     </button>
@@ -103,18 +103,18 @@
                  class="card mb-4 border-2 cursor-pointer hover:shadow-lg transition-shadow" 
                  :class="budget.status === 'paused' ? 'border-yellow-300 dark:border-yellow-700 opacity-75' : 'border-primary-300 dark:border-primary-700 bg-gradient-to-r from-primary-50/50 to-transparent dark:from-primary-900/20'"
                  @click="openTransactionHistoryModal(budget)">
-                <div class="flex items-center justify-between mb-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
                     <div class="flex items-center gap-3">
-                        <div class="w-14 h-14 rounded-xl flex items-center justify-center"
+                        <div class="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
                              :class="budget.status === 'paused' ? 'bg-yellow-100 dark:bg-yellow-900/50' : 'bg-primary-100 dark:bg-primary-900/50'">
                             <svg class="w-7 h-7" :class="budget.status === 'paused' ? 'text-yellow-600 dark:text-yellow-400' : 'text-primary-600 dark:text-primary-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white break-all sm:break-normal">
                                 {{ budget.name }}
-                                <span class="ml-2 text-sm font-normal px-2 py-0.5 rounded-full" 
+                                <span class="ml-2 text-sm font-normal px-2 py-0.5 rounded-full inline-block" 
                                       :class="budget.period_type === 'monthly' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'">
                                     {{ budget.period_type === 'monthly' ? 'Mensal' : 'Anual' }}
                                 </span>
@@ -126,7 +126,7 @@
                             </p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2" @click.stop>
+                    <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end" @click.stop>
                         <!-- Status Badge with Icon -->
                         <span v-if="getBudgetCurrentPeriod(budget)" :class="getStatusBadgeClass(getBudgetCurrentPeriod(budget)?.status || 'within')">
                             {{ getStatusIcon(getBudgetCurrentPeriod(budget)?.status || 'within') }}
@@ -188,7 +188,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 <p class="text-gray-500 mb-3">Você ainda não tem um orçamento geral {{ periodType === 'mensal' ? 'mensal' : 'anual' }}</p>
-                <button @click="openGeneralBudgetModalWithType(periodType === 'mensal' ? 'monthly' : 'yearly')" class="btn-primary btn-sm">
+                <button @click="openGeneralBudgetModalWithType(periodType === 'mensal' ? 'monthly' : 'yearly')" class="btn-primary btn-sm w-full sm:w-auto">
                     + Criar Orçamento {{ periodType === 'mensal' ? 'Mensal' : 'Anual' }}
                 </button>
             </div>
@@ -199,11 +199,11 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 <p class="text-gray-500 mb-3">Você ainda não tem nenhum orçamento geral</p>
-                <div class="flex justify-center gap-2">
-                    <button @click="openGeneralBudgetModalWithType('monthly')" class="btn-primary btn-sm">
+                <div class="flex flex-col sm:flex-row justify-center gap-2">
+                    <button @click="openGeneralBudgetModalWithType('monthly')" class="btn-primary btn-sm w-full sm:w-auto">
                         + Criar Mensal
                     </button>
-                    <button @click="openGeneralBudgetModalWithType('yearly')" class="btn-secondary btn-sm">
+                    <button @click="openGeneralBudgetModalWithType('yearly')" class="btn-secondary btn-sm w-full sm:w-auto">
                         + Criar Anual
                     </button>
                 </div>
@@ -280,7 +280,7 @@
                     class="card hover:shadow-md transition-shadow cursor-pointer"
                     @click="openCategoryBudgetHistoryModal(budget)"
                 >
-                    <div class="flex items-center justify-between mb-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-3">
                         <div class="flex items-center gap-3">
                             <!-- Category icon -->
                             <div 

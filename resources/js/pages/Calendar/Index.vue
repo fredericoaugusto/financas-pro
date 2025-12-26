@@ -71,7 +71,7 @@
                             {{ day.dayNumber }}
                         </span>
                         <span v-if="getDayBalance(day.date) !== 0" :class="[
-                            'text-xs font-medium',
+                            'text-xs font-medium hidden sm:block',
                             getDayBalance(day.date) > 0 ? 'text-green-600' : 'text-red-600'
                         ]">
                             {{ formatCurrency(getDayBalance(day.date), true) }}

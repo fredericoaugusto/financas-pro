@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">📤 Importar Extrato</h1>
         <p class="text-gray-500 dark:text-gray-400 mt-1">Importe seu extrato bancário no formato OFX/QFX</p>
@@ -88,9 +88,9 @@
         </div>
       </div>
 
-      <!-- Table -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div class="overflow-x-auto">
+       <!-- Table -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden max-w-[90vw] sm:max-w-full mx-auto">
+        <div class="overflow-x-auto w-full">
           <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-900">
               <tr>
