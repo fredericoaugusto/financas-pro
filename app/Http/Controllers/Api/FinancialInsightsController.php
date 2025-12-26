@@ -21,18 +21,27 @@ class FinancialInsightsController extends Controller
      */
     public function summary(): JsonResponse
     {
-        $summary = $this->service->getSummary();
+        try {
+            $summary = $this->service->getSummary();
 
-        // Limit lists for summary if needed, but for now returning full structure 
-        // allows frontend to decide what to show in "Smart Summary".
-        // Maybe we slice anomalies/trends here to top 5?
+            // Limit lists for summary if needed, but for now returning full structure 
+            // allows frontend to decide what to show in "Smart Summary".
+            // Maybe we slice anomalies/trends here to top 5?
+            $summary['anomalies'] = collect($summary['anomalies'])->take(5)->values();
+            $summary['trends'] = collect($summary['trends'])->take(5)->values();
 
-        $summary['anomalies'] = collect($summary['anomalies'])->take(5)->values();
-        $summary['trends'] = collect($summary['trends'])->take(5)->values();
-
-        return response()->json([
-            'data' => $summary
-        ]);
+            return response()->json([
+                'data' => $summary
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Erro ao carregar insights',
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
     }
 
     /**

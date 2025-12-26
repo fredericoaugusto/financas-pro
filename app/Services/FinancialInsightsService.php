@@ -131,12 +131,16 @@ class FinancialInsightsService
         $start = Carbon::now()->subMonths(6)->startOfMonth();
 
         // Vamos buscar tudo e agrupar no PHP para segurança e compatibilidade de banco.
-        $transactions = Transaction::with('category')
+        $transactions = Transaction::with(['category', 'account'])
             ->where('user_id', $userId)
-            ->includedInTotals()
+            // ->includedInTotals() // Removido para evitar erro de SQL no Postgres
             ->where('type', 'despesa')
             ->where('date', '>=', $start)
-            ->get();
+            ->whereNotIn('status', ['estornada', 'cancelada'])
+            ->get()
+            ->filter(function ($t) {
+                return !$t->account || !$t->account->exclude_from_totals;
+            });
 
         $grouped = $transactions->groupBy(function ($t) {
             return $t->category_id . '|' . Carbon::parse($t->date)->format('Y-m');
@@ -195,12 +199,16 @@ class FinancialInsightsService
         $userId = Auth::id();
         $start = Carbon::now()->subMonths(2);
 
-        $transactions = Transaction::with('category')
+        $transactions = Transaction::with(['category', 'account'])
             ->where('user_id', $userId)
-            ->includedInTotals()
+            // ->includedInTotals()
             ->where('type', 'despesa')
             ->where('date', '>=', $start)
-            ->get();
+            ->whereNotIn('status', ['estornada', 'cancelada'])
+            ->get()
+            ->filter(function ($t) {
+                return !$t->account || !$t->account->exclude_from_totals;
+            });
 
         $patterns = [];
         $weekdayCounts = [];
@@ -255,10 +263,15 @@ class FinancialInsightsService
         $userId = Auth::id();
         $start = Carbon::now()->subMonths(6)->startOfMonth();
 
-        $monthlyStats = Transaction::where('user_id', $userId)
-            ->includedInTotals()
+        $monthlyStats = Transaction::with('account')
+            ->where('user_id', $userId)
+            // ->includedInTotals()
             ->where('date', '>=', $start)
+            ->whereNotIn('status', ['estornada', 'cancelada'])
             ->get()
+            ->filter(function ($t) {
+                return !$t->account || !$t->account->exclude_from_totals;
+            })
             ->groupBy(function ($t) {
                 return Carbon::parse($t->date)->format('Y-m');
             })
