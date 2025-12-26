@@ -435,6 +435,7 @@ const invoicePreviewMonth = computed(() => {
     if (!selectedCard.value || !form.date) return '';
     
     const closingDay = selectedCard.value.closing_day || 1;
+    const dueDay = selectedCard.value.due_day || 15;
     
     // If starting from a later installment, use today's date (current open invoice)
     // Otherwise, use the purchase date
@@ -450,6 +451,33 @@ const invoicePreviewMonth = computed(() => {
     // So we add 1 to get the due month
     if (referenceDate.getDate() >= closingDay) {
         invoiceMonth++;
+    }
+    
+    // IMPORTANT: When current_installment > 1 (ongoing installment), we need to check
+    // if the invoice for that calculated month has already PASSED its due date.
+    // If today > due_day of the invoice month, that invoice is no longer open, 
+    // so the actual current open invoice is the NEXT month.
+    if (form.current_installment > 1) {
+        // Check if the calculated invoice due date has already passed
+        // Invoice month is calculated, let's see if today is past its due
+        let tempInvoiceMonth = invoiceMonth;
+        let tempInvoiceYear = invoiceYear;
+        
+        // Normalize first to get correct month/year
+        if (tempInvoiceMonth > 11) {
+            tempInvoiceYear += Math.floor(tempInvoiceMonth / 12);
+            tempInvoiceMonth = tempInvoiceMonth % 12;
+        }
+        
+        // Calculate due date of this invoice
+        const daysInMonth = new Date(tempInvoiceYear, tempInvoiceMonth + 1, 0).getDate();
+        const effectiveDueDay = Math.min(dueDay, daysInMonth);
+        const invoiceDueDate = new Date(tempInvoiceYear, tempInvoiceMonth, effectiveDueDay);
+        
+        // If today is after the due date, the current open invoice is actually next month
+        if (referenceDate > invoiceDueDate) {
+            invoiceMonth++;
+        }
     }
     
     // Normalize months and years

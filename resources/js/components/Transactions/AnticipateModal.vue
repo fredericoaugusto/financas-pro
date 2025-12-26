@@ -141,11 +141,20 @@ onMounted(async () => {
 const availableInstallments = computed(() => {
     if (!transactionData.value || !transactionData.value.card_installments) return [];
     
-    // Filter: Only future installments (not the first one which is in current invoice)
-    // Exclude: paid, estornada, antecipada, and installment_number === 1 (current invoice)
-    return transactionData.value.card_installments.filter(i => 
+    const installments = transactionData.value.card_installments;
+    
+    // Find the first (current) invoice ID - this is the one we can't anticipate from
+    // The first installment by number is in the current/first invoice
+    const firstInstallment = installments.reduce((min, i) => 
+        !min || i.installment_number < min.installment_number ? i : min, null);
+    
+    const currentInvoiceId = firstInstallment?.card_invoice_id;
+    
+    // Filter: Exclude installments that are in the current/first invoice
+    // Also exclude: paid, estornada, antecipada
+    return installments.filter(i => 
         ['pendente', 'em_fatura'].includes(i.status) &&
-        i.installment_number > 1 // Exclude first installment (current invoice)
+        i.card_invoice_id !== currentInvoiceId // Exclude current invoice installments
     ).sort((a, b) => a.installment_number - b.installment_number);
 });
 
