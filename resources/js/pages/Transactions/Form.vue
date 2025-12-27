@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div class="px-4 sm:px-0">
         <div class="mb-6">
             <RouterLink to="/transactions" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 mb-2">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -35,7 +35,7 @@
                     <!-- Type -->
                     <div>
                         <label class="label">Tipo de lançamento *</label>
-                        <div class="flex gap-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <button
                                 type="button"
                                 @click="form.type = 'receita'"
@@ -104,7 +104,7 @@
                     </div>
 
                     <!-- Date and Time -->
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label for="date" class="label">Data *</label>
                             <input
@@ -136,7 +136,7 @@
                     <!-- Payment method for expenses -->
                     <div v-if="form.type === 'despesa'">
                         <label class="label">Forma de pagamento</label>
-                        <div class="flex gap-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <button
                                 type="button"
                                 @click="form.payment_method = 'dinheiro'; form.card_id = null"
@@ -299,7 +299,7 @@
                     <h2 class="text-lg font-semibold text-purple-900 dark:text-purple-100">Resumo da Compra no Crédito</h2>
                 </div>
                 
-                <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div class="bg-white/60 dark:bg-gray-800/60 rounded-lg p-3">
                         <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Cartão</p>
                         <p class="font-semibold text-gray-900 dark:text-white">{{ selectedCardName }}</p>

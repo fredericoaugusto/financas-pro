@@ -17,7 +17,7 @@
             <p class="text-sm text-gray-400 mt-1 break-words">Registre despesas para visualizar a distribuição por categoria.</p>
         </div>
 
-        <div v-else class="flex-1 min-h-[300px]">
+        <div v-else class="w-full h-[280px]">
             <BaseChart
                 type="doughnut"
                 :data="chartData"

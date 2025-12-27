@@ -71,7 +71,7 @@
             <div 
                 v-for="recurring in filteredRecurrings" 
                 :key="recurring.id"
-                class="card hover:shadow-lg transition-shadow cursor-pointer"
+                class="card hover:shadow-lg transition-shadow cursor-pointer p-3 sm:p-6 w-full max-w-full"
                 @click="openDetailModal(recurring)"
             >
                 <!-- Mobile: Stack everything vertically -->
@@ -129,7 +129,7 @@
                         </div>
 
                         <!-- Actions -->
-                        <div class="flex items-center gap-1" @click.stop>
+                        <div class="flex flex-wrap items-center gap-2 justify-start sm:justify-end" @click.stop>
                             <button 
                                 v-if="recurring.status === 'ativa'"
                                 @click="openGenerateConfirm(recurring)"
