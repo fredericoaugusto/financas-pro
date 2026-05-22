@@ -1,76 +1,96 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  ActivityIndicator, Dimensions, RefreshControl
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { PieChart, LineChart, ProgressChart } from 'react-native-chart-kit';
+import { PieChart, LineChart, BarChart } from 'react-native-chart-kit';
 import api from '../../services/api';
 
-const screenWidth = Dimensions.get('window').width - 40; // padding 20 on each side
+const { width: SW } = Dimensions.get('window');
+const CHART_W = SW - 48;
+const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+const chartCfg = {
+  backgroundGradientFrom: '#fff',
+  backgroundGradientTo: '#fff',
+  color: (opacity = 1) => `rgba(15, 23, 42, ${opacity})`,
+  labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
+  strokeWidth: 2,
+  decimalPlaces: 0,
+  propsForDots: { r: '4', strokeWidth: '2', stroke: '#10b981' },
+};
 
 export default function ChartsScreen() {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [categoryData, setCategoryData] = useState<any[]>([]);
   const [monthlyData, setMonthlyData] = useState<any>(null);
-  const [savingsRate, setSavingsRate] = useState<number>(0);
+  const [barData, setBarData] = useState<any>(null);
+  const [savingsRate, setSavingsRate] = useState(0);
+  const [savingsSaved, setSavingsSaved] = useState(0);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
-  const loadData = async () => {
+  const loadData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      // Pega data para os últimos 6 meses
       const dateFrom = new Date();
       dateFrom.setMonth(dateFrom.getMonth() - 5);
-      const strDateFrom = `${dateFrom.getFullYear()}-${String(dateFrom.getMonth()+1).padStart(2,'0')}-01`;
+      const strFrom = `${dateFrom.getFullYear()}-${String(dateFrom.getMonth()+1).padStart(2,'0')}-01`;
 
       const [catRes, evoRes, saveRes] = await Promise.all([
-        api.get('/reports/by-category', { params: { type: 'despesa', date_from: strDateFrom } }),
-        api.get('/reports/monthly-evolution', { params: { date_from: strDateFrom } }),
-        api.get('/reports/savings-rate', { params: { date_from: strDateFrom } })
+        api.get('/reports/by-category', { params: { type: 'despesa', date_from: strFrom } }),
+        api.get('/reports/monthly-evolution', { params: { date_from: strFrom } }),
+        api.get('/reports/savings-rate', { params: { date_from: strFrom } }),
       ]);
 
-      // Formata pie chart
+      // Pie chart data
       const rawCat = catRes.data.data || [];
-      const formattedCat = rawCat.map((c: any) => ({
-        name: c.name,
-        population: parseFloat(c.total),
-        color: c.color || '#94a3b8',
-        legendFontColor: '#1e293b',
-        legendFontSize: 12
-      }));
-      setCategoryData(formattedCat);
+      const COLORS = ['#10b981','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899'];
+      setCategoryData(
+        rawCat.slice(0, 8).map((c: any, i: number) => ({
+          name: c.name.length > 12 ? c.name.slice(0, 12) + '…' : c.name,
+          population: parseFloat(c.total) || 0,
+          color: c.color || COLORS[i % COLORS.length],
+          legendFontColor: '#1e293b',
+          legendFontSize: 11,
+        }))
+      );
 
-      // Formata line chart
+      // Line chart
       const rawEvo = evoRes.data.data || evoRes.data;
-      if (rawEvo && rawEvo.length > 0) {
+      if (rawEvo?.length > 0) {
+        const labels = rawEvo.map((m: any) => m.month || '');
         setMonthlyData({
-          labels: rawEvo.map((m: any) => m.month),
+          labels,
           datasets: [
-            { data: rawEvo.map((m: any) => parseFloat(m.despesa) || 0), color: (o=1) => `rgba(239, 68, 68, ${o})`, strokeWidth: 2 }, // Vermelho
-            { data: rawEvo.map((m: any) => parseFloat(m.receita) || 0), color: (o=1) => `rgba(16, 185, 129, ${o})`, strokeWidth: 2 }  // Verde
+            { data: rawEvo.map((m: any) => parseFloat(m.receita) || 0), color: (o=1) => `rgba(16,185,129,${o})`, strokeWidth: 2 },
+            { data: rawEvo.map((m: any) => parseFloat(m.despesa) || 0), color: (o=1) => `rgba(239,68,68,${o})`, strokeWidth: 2 },
           ],
-          legend: ['Despesas', 'Receitas']
+          legend: ['Receitas', 'Despesas'],
+        });
+        // Bar chart using same data
+        setBarData({
+          labels,
+          datasets: [{ data: rawEvo.map((m: any) => parseFloat(m.despesa) || 0) }],
         });
       }
 
-      setSavingsRate(parseFloat(saveRes.data.rate || saveRes.data.savings_rate || 0) / 100);
-
+      const rate = parseFloat(saveRes.data.rate || saveRes.data.savings_rate || 0);
+      const saved = parseFloat(saveRes.data.saved || 0);
+      setSavingsRate(rate < 0 ? 0 : rate > 100 ? 100 : rate);
+      setSavingsSaved(saved);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#10b981" /></View>;
-
-  const chartConfig = {
-    backgroundGradientFrom: '#fff',
-    backgroundGradientTo: '#fff',
-    color: (opacity = 1) => `rgba(15, 23, 42, ${opacity})`,
-    strokeWidth: 2,
-    useShadowColorFromDataset: false,
-    decimalPlaces: 0,
-  };
 
   return (
     <View style={s.root}>
@@ -79,56 +99,99 @@ export default function ChartsScreen() {
         <Text style={s.sub}>Análise visual de suas finanças</Text>
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor="#10b981" colors={['#10b981']} />}
+      >
         {/* Taxa de Poupança */}
         <View style={s.card}>
-          <Text style={s.cardTitle}>Taxa de Poupança (Últimos 6 meses)</Text>
-          <View style={s.progressRow}>
-            <ProgressChart
-              data={{ labels: ["Poupança"], data: [savingsRate > 1 ? 1 : (savingsRate < 0 ? 0 : savingsRate)] }}
-              width={140} height={140} strokeWidth={16} radius={48}
-              chartConfig={{...chartConfig, color: (o=1)=>`rgba(16, 185, 129, ${o})`}}
-              hideLegend={true}
-            />
-            <View style={s.progressInfo}>
-              <Text style={s.progressVal}>{(savingsRate * 100).toFixed(1)}%</Text>
-              <Text style={s.progressDesc}>da sua renda foi poupada neste período.</Text>
+          <Text style={s.cardTitle}>💰 Taxa de Poupança</Text>
+          <Text style={s.cardSub}>Últimos 6 meses</Text>
+          <View style={s.savingsRow}>
+            <View style={s.savingsRing}>
+              <Text style={[s.ringPct, { color: savingsRate >= 20 ? '#10b981' : savingsRate >= 10 ? '#f59e0b' : '#ef4444' }]}>
+                {savingsRate.toFixed(1)}%
+              </Text>
+              <Text style={s.ringSub}>poupado</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={s.barBg}>
+                <View style={[s.barFill, { width: `${savingsRate}%` as any, backgroundColor: savingsRate >= 20 ? '#10b981' : savingsRate >= 10 ? '#f59e0b' : '#ef4444' }]} />
+              </View>
+              <Text style={s.savingsSaved}>
+                Economizou R$ {savingsSaved.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </Text>
+              <Text style={s.savingsTip}>
+                {savingsRate >= 20 ? '🎯 Excelente! Acima de 20%' : savingsRate >= 10 ? '👍 Bom! Tente chegar a 20%' : '⚠️ Tente poupar pelo menos 10%'}
+              </Text>
             </View>
           </View>
         </View>
 
         {/* Evolução Mensal */}
         <View style={s.card}>
-          <Text style={s.cardTitle}>Evolução (Receitas vs Despesas)</Text>
+          <Text style={s.cardTitle}>📈 Receitas vs Despesas</Text>
+          <Text style={s.cardSub}>Evolução dos últimos 6 meses</Text>
           {monthlyData ? (
-            <LineChart
-              data={monthlyData}
-              width={screenWidth - 8}
-              height={220}
-              chartConfig={chartConfig}
-              bezier
-              style={{ marginVertical: 8, borderRadius: 16, marginLeft: -16 }}
-            />
-          ) : <Text style={s.emptyTxt}>Dados insuficientes.</Text>}
+            <>
+              <View style={s.legendRow}>
+                <View style={s.legendItem}><View style={[s.legendDot, { backgroundColor: '#10b981' }]} /><Text style={s.legendTxt}>Receitas</Text></View>
+                <View style={s.legendItem}><View style={[s.legendDot, { backgroundColor: '#ef4444' }]} /><Text style={s.legendTxt}>Despesas</Text></View>
+              </View>
+              <LineChart
+                data={monthlyData}
+                width={CHART_W}
+                height={200}
+                chartConfig={chartCfg}
+                bezier
+                style={s.chartStyle}
+                withDots={true}
+                withShadow={false}
+              />
+            </>
+          ) : (
+            <View style={s.emptyChart}><Ionicons name="trending-up-outline" size={36} color="#cbd5e1" /><Text style={s.emptyTxt}>Dados insuficientes</Text></View>
+          )}
         </View>
 
         {/* Despesas por Categoria */}
         <View style={s.card}>
-          <Text style={s.cardTitle}>Despesas por Categoria</Text>
+          <Text style={s.cardTitle}>🍰 Despesas por Categoria</Text>
+          <Text style={s.cardSub}>Distribuição no período</Text>
           {categoryData.length > 0 ? (
             <PieChart
               data={categoryData}
-              width={screenWidth}
+              width={CHART_W}
               height={200}
-              chartConfig={chartConfig}
-              accessor={"population"}
-              backgroundColor={"transparent"}
-              paddingLeft={"0"}
+              chartConfig={chartCfg}
+              accessor="population"
+              backgroundColor="transparent"
+              paddingLeft="0"
               absolute
             />
-          ) : <Text style={s.emptyTxt}>Nenhuma despesa no período.</Text>}
+          ) : (
+            <View style={s.emptyChart}><Ionicons name="pie-chart-outline" size={36} color="#cbd5e1" /><Text style={s.emptyTxt}>Nenhuma despesa no período</Text></View>
+          )}
         </View>
+
+        {/* Despesas Mensais (Bar) */}
+        {barData && (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>📊 Despesas por Mês</Text>
+            <Text style={s.cardSub}>Comparativo mensal</Text>
+            <BarChart
+              data={barData}
+              width={CHART_W}
+              height={200}
+              chartConfig={{ ...chartCfg, color: (o=1) => `rgba(239,68,68,${o})` }}
+              style={s.chartStyle}
+              showValuesOnTopOfBars
+              yAxisLabel="R$"
+              yAxisSuffix=""
+            />
+          </View>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -143,11 +206,22 @@ const s = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '800', color: '#0f172a' },
   sub: { fontSize: 14, color: '#64748b', marginTop: 2 },
   scroll: { padding: 20 },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#f1f5f9', marginBottom: 16, overflow: 'hidden' },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 16 },
-  emptyTxt: { fontSize: 14, color: '#94a3b8', textAlign: 'center', marginVertical: 20 },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  progressInfo: { flex: 1 },
-  progressVal: { fontSize: 28, fontWeight: '800', color: '#10b981' },
-  progressDesc: { fontSize: 13, color: '#64748b', marginTop: 4, lineHeight: 18 },
+  card: { backgroundColor: '#fff', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#f1f5f9', marginBottom: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 2 },
+  cardSub: { fontSize: 12, color: '#94a3b8', fontWeight: '500', marginBottom: 16 },
+  chartStyle: { marginVertical: 4, borderRadius: 12, marginLeft: -16 },
+  savingsRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  savingsRing: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  ringPct: { fontSize: 20, fontWeight: '900', lineHeight: 22 },
+  ringSub: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
+  barBg: { height: 8, backgroundColor: '#f1f5f9', borderRadius: 4, overflow: 'hidden', marginBottom: 10 },
+  barFill: { height: '100%', borderRadius: 4 },
+  savingsSaved: { fontSize: 13, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
+  savingsTip: { fontSize: 12, color: '#64748b' },
+  legendRow: { flexDirection: 'row', gap: 16, marginBottom: 8 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendTxt: { fontSize: 12, fontWeight: '600', color: '#64748b' },
+  emptyChart: { alignItems: 'center', paddingVertical: 32, gap: 8 },
+  emptyTxt: { fontSize: 13, color: '#94a3b8', fontWeight: '500' },
 });

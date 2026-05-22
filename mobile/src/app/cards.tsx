@@ -116,6 +116,24 @@ export default function CardsScreen() {
     ]);
   };
 
+  const handleDelete = (id: number, cardName: string) => {
+    Alert.alert('Excluir Cartão', `Deseja excluir "${cardName}"? Os lançamentos vinculados serão mantidos.`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir', style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/cards/${id}`);
+            toast({ type: 'success', title: 'Cartão excluído!' });
+            fetchCards();
+          } catch (e: any) {
+            toast({ type: 'error', title: 'Erro', message: e.response?.data?.message || 'Não foi possível excluir.' });
+          }
+        }
+      }
+    ]);
+  };
+
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#10b981" /></View>;
 
   return (
@@ -191,27 +209,67 @@ export default function CardsScreen() {
 
       {!showForm && (
         <FlatList
-        data={cards}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={s.list}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={s.card} activeOpacity={0.8} onPress={() => loadInvoice(item)}>
-            <View style={s.cardHeader}>
-              <View style={s.cardIcon}><Ionicons name="card" size={24} color="#10b981" /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.cardName}>{item.name}</Text>
-                <Text style={s.cardLimit}>Limite: R$ {parseFloat(item.limit || 0).toFixed(2)}</Text>
+          data={cards}
+          keyExtractor={item => item.id.toString()}
+          contentContainerStyle={s.list}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => {
+            const cardColor = item.color || '#1e293b';
+            const limit = parseFloat(item.limit || 0);
+            return (
+              <View style={s.card}>
+                {/* Visual Card */}
+                <View style={[s.cardVisual, { backgroundColor: cardColor }]}>
+                  <View style={s.cardVisualTop}>
+                    <Text style={s.cardVisualName}>{item.name}</Text>
+                    <Text style={s.cardVisualBrand}>{item.brand || 'Card'}</Text>
+                  </View>
+                  <Text style={s.cardVisualNumber}>•••• •••• •••• {item.last_four || '****'}</Text>
+                  <View style={s.cardVisualBot}>
+                    <View>
+                      <Text style={s.cardVisualLbl}>Titular</Text>
+                      <Text style={s.cardVisualVal}>{item.cardholder_name || item.name}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={s.cardVisualLbl}>Validade</Text>
+                      <Text style={s.cardVisualVal}>{item.expiration_date || '—'}</Text>
+                    </View>
+                  </View>
+                </View>
+                {/* Info Row */}
+                <View style={s.cardInfoRow}>
+                  <View>
+                    <Text style={s.cardInfoLabel}>Limite total</Text>
+                    <Text style={s.cardInfoVal}>R$ {limit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={s.cardInfoLabel}>Fecha dia</Text>
+                    <Text style={s.cardInfoVal}>{item.closing_day}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={s.cardInfoLabel}>Vence dia</Text>
+                    <Text style={s.cardInfoVal}>{item.due_day}</Text>
+                  </View>
+                </View>
+                {/* Actions */}
+                <View style={s.cardActions}>
+                  <TouchableOpacity style={s.cardActionBtn} onPress={() => openForm(item)}>
+                    <Ionicons name="create-outline" size={16} color="#64748b" />
+                    <Text style={s.cardActionTxt}>Editar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.cardActionBtn} onPress={() => loadInvoice(item)}>
+                    <Ionicons name="receipt-outline" size={16} color="#10b981" />
+                    <Text style={[s.cardActionTxt, { color: '#10b981' }]}>Ver Fatura</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.cardActionBtn, { backgroundColor: '#fee2e2' }]} onPress={() => handleDelete(item.id, item.name)}>
+                    <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
               </View>
-              <TouchableOpacity onPress={() => openForm(item)} style={{ padding: 4 }}><Ionicons name="create-outline" size={20} color="#64748b" /></TouchableOpacity>
-            </View>
-            <View style={s.cardFooter}>
-              <Text style={s.cardDates}>Fecha dia {item.closing_day} • Vence dia {item.due_day}</Text>
-              <View style={s.invoiceBtn}><Text style={s.invoiceBtnTxt}>Ver Fatura</Text><Ionicons name="chevron-forward" size={14} color="#10b981" /></View>
-            </View>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={<EmptyState icon="card-outline" title="Nenhum cartão" subtitle="Adicione um cartão de crédito para gerenciar faturas." actionLabel="Adicionar Cartão" onAction={() => openForm()} />}
-      />
+            );
+          }}
+          ListEmptyComponent={<EmptyState icon="card-outline" title="Nenhum cartão" subtitle="Adicione um cartão de crédito para gerenciar faturas." actionLabel="Adicionar Cartão" onAction={() => openForm()} />}
+        />
       )}
 
       {/* Modal de Fatura */}
@@ -268,14 +326,21 @@ const s = StyleSheet.create({
   cancelBtn: { flex: 1, height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center' }, cancelTxt: { fontSize: 14, fontWeight: '600', color: '#64748b' },
   saveBtn: { flex: 1, height: 44, borderRadius: 12, backgroundColor: '#10b981', justifyContent: 'center', alignItems: 'center' }, saveTxt: { fontSize: 14, fontWeight: '700', color: '#fff' },
   list: { padding: 20, paddingBottom: 100 },
-  card: { backgroundColor: '#1e293b', borderRadius: 20, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
-  cardIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: 'rgba(16, 185, 129, 0.15)', justifyContent: 'center', alignItems: 'center' },
-  cardName: { fontSize: 18, fontWeight: '700', color: '#fff' }, cardLimit: { fontSize: 13, color: '#94a3b8', marginTop: 2 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 16 },
-  cardDates: { fontSize: 12, color: '#94a3b8' },
-  invoiceBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, gap: 4 },
-  invoiceBtnTxt: { fontSize: 12, fontWeight: '700', color: '#10b981' },
+  card: { backgroundColor: '#fff', borderRadius: 20, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#f1f5f9', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
+  cardVisual: { padding: 20, paddingBottom: 24, minHeight: 160 },
+  cardVisualTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  cardVisualName: { fontSize: 17, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+  cardVisualBrand: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
+  cardVisualNumber: { fontSize: 16, fontWeight: '600', color: 'rgba(255,255,255,0.9)', letterSpacing: 2, marginBottom: 20 },
+  cardVisualBot: { flexDirection: 'row', justifyContent: 'space-between' },
+  cardVisualLbl: { fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: '600', letterSpacing: 0.5, marginBottom: 2 },
+  cardVisualVal: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  cardInfoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
+  cardInfoLabel: { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginBottom: 3 },
+  cardInfoVal: { fontSize: 15, fontWeight: '800', color: '#0f172a' },
+  cardActions: { flexDirection: 'row', gap: 8, padding: 14 },
+  cardActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#f1f5f9' },
+  cardActionTxt: { fontSize: 13, fontWeight: '600', color: '#64748b' },
   modalRoot: { flex: 1, backgroundColor: '#f9fafb' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', padding: 20, paddingTop: 40, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   modalTitle: { fontSize: 18, fontWeight: '700' },

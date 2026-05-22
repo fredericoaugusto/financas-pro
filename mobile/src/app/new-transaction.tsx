@@ -32,9 +32,10 @@ export default function NewTransactionScreen() {
   const [cards, setCards] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [accountId, setAccountId] = useState<number|null>(null);
+  const [destAccountId, setDestAccountId] = useState<number|null>(null);
   const [cardId, setCardId] = useState<number|null>(null);
   const [categoryId, setCategoryId] = useState<number|null>(null);
-  const [pickerType, setPickerType] = useState<'account'|'card'|'category'|null>(null);
+  const [pickerType, setPickerType] = useState<'account'|'destAccount'|'card'|'category'|null>(null);
 
   useEffect(() => {
     api.get('/accounts').then(r => setAccounts(r.data.data||r.data)).catch(()=>{});
@@ -43,6 +44,7 @@ export default function NewTransactionScreen() {
   }, []);
 
   const selectedAccount = accounts.find(a => a.id === accountId);
+  const selectedDestAccount = accounts.find(a => a.id === destAccountId);
   const selectedCard = cards.find(c => c.id === cardId);
   const selectedCategory = categories.find(c => c.id === categoryId);
 
@@ -65,11 +67,12 @@ export default function NewTransactionScreen() {
     try {
       await api.post('/transactions', {
         type, value: num, description: desc, date: `${date} ${time}`,
-        payment_method: payment === 'Dinheiro/PIX' ? 'pix' : payment.toLowerCase(),
+        payment_method: type === 'transferencia' ? null : (payment === 'Dinheiro/PIX' ? 'pix' : payment.toLowerCase()),
         status: status === 'pago' ? 'confirmada' : 'pendente',
-        account_id: payment !== 'Crédito' ? accountId : null,
-        card_id: payment === 'Crédito' ? cardId : null,
-        category_id: categoryId,
+        account_id: accountId,
+        destination_account_id: type === 'transferencia' ? destAccountId : null,
+        card_id: (payment === 'Crédito' && type !== 'transferencia') ? cardId : null,
+        category_id: type === 'transferencia' ? null : categoryId,
         notes
       });
       toast({type:'success',title:'Lançamento criado!'});
@@ -93,9 +96,10 @@ export default function NewTransactionScreen() {
         {/* Tipo */}
         <View style={s.typeRow}>
           {TIPOS.map(t=>(
-            <TouchableOpacity key={t.value} style={[s.typeBtn,type===t.value&&{backgroundColor:t.bg,borderColor:t.color}]} onPress={()=>setType(t.value as any)}>
-              <Ionicons name={t.icon as any} size={18} color={type===t.value?t.color:'#94a3b8'}/>
-              <Text style={[s.typeTxt,type===t.value&&{color:t.color,fontWeight:'700'}]}>{t.label}</Text>
+            <TouchableOpacity key={t.value} style={[s.typeBtn, type === t.value && { borderColor: t.color, backgroundColor: '#fff' }]} onPress={()=>setType(t.value as any)} activeOpacity={0.7}>
+              <Text style={[s.typeTxt, type === t.value && { color: t.color, fontWeight: '600' }]}>
+                {t.value === 'receita' ? '↑ Receita' : t.value === 'despesa' ? '↓ Despesa' : '⇄ Transferência'}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -136,55 +140,77 @@ export default function NewTransactionScreen() {
           <Text style={s.label}>Status</Text>
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <TouchableOpacity style={[s.statusBtn, status==='pago' && { borderColor: '#10b981', backgroundColor: '#dcfce7' }]} onPress={() => setStatus('pago')}>
-              <Ionicons name="checkmark-circle" size={18} color={status==='pago' ? '#10b981' : '#cbd5e1'} />
-              <Text style={[s.statusTxt, status==='pago' && { color: '#10b981' }]}>Pago</Text>
+              <Text style={[s.statusTxt, status==='pago' && { color: '#10b981' }]}>👍 {type === 'receita' ? 'Recebido' : 'Pago'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.statusBtn, status==='pendente' && { borderColor: '#f59e0b', backgroundColor: '#fef3c7' }]} onPress={() => setStatus('pendente')}>
-              <Ionicons name="time" size={18} color={status==='pendente' ? '#f59e0b' : '#cbd5e1'} />
-              <Text style={[s.statusTxt, status==='pendente' && { color: '#f59e0b' }]}>Pendente</Text>
+              <Text style={[s.statusTxt, status==='pendente' && { color: '#f59e0b' }]}>👎 Pendente</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Forma Pagamento e Conta/Cartão */}
-        <View style={s.sectionBox}>
-          <Text style={s.sectionTitle}>Conta / Cartão</Text>
-          <Text style={s.label}>Forma de pagamento</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.payRow}>
-            {PAYMENTS.map(p=>(
-              <TouchableOpacity key={p} style={[s.pill,payment===p&&s.pillA]} onPress={()=>setPayment(p)}>
-                <Text style={[s.pillTxt,payment===p&&s.pillTxtA]}>{p}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {payment !== 'Crédito' ? (
-            <View style={{ marginTop: 16 }}>
-              <Text style={s.label}>Conta</Text>
+        {type === 'transferencia' ? (
+          <View style={s.sectionBox}>
+            <Text style={s.sectionTitle}>Contas</Text>
+            
+            <View style={{ marginBottom: 16 }}>
+              <Text style={s.label}>Conta de origem</Text>
               <TouchableOpacity style={s.picker} onPress={()=>setPickerType('account')}>
                 <Text style={s.pickerTxt}>{selectedAccount?.name||'Selecione...'}</Text>
                 <Ionicons name="chevron-down" size={16} color="#94a3b8"/>
               </TouchableOpacity>
             </View>
-          ) : (
-            <View style={{ marginTop: 16 }}>
-              <Text style={s.label}>Cartão de Crédito</Text>
-              <TouchableOpacity style={s.picker} onPress={()=>setPickerType('card')}>
-                <Text style={s.pickerTxt}>{selectedCard?.name||'Selecione...'}</Text>
+
+            <View>
+              <Text style={s.label}>Conta de destino</Text>
+              <TouchableOpacity style={s.picker} onPress={()=>setPickerType('destAccount')}>
+                <Text style={s.pickerTxt}>{selectedDestAccount?.name||'Selecione...'}</Text>
                 <Ionicons name="chevron-down" size={16} color="#94a3b8"/>
               </TouchableOpacity>
             </View>
-          )}
-        </View>
+          </View>
+        ) : (
+          <>
+            {/* Forma Pagamento e Conta/Cartão */}
+            <View style={s.sectionBox}>
+              <Text style={s.sectionTitle}>Conta / Cartão</Text>
+              <Text style={s.label}>Forma de pagamento</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.payRow}>
+                {PAYMENTS.map(p=>(
+                  <TouchableOpacity key={p} style={[s.pill,payment===p&&s.pillA]} onPress={()=>setPayment(p)}>
+                    <Text style={[s.pillTxt,payment===p&&s.pillTxtA]}>{p}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
 
-        {/* Categoria */}
-        <View style={s.group}>
-          <Text style={s.label}>Categoria</Text>
-          <TouchableOpacity style={s.picker} onPress={()=>setPickerType('category')}>
-            <Text style={s.pickerTxt}>{selectedCategory?.name||'Selecione...'}</Text>
-            <Ionicons name="chevron-down" size={16} color="#94a3b8"/>
-          </TouchableOpacity>
-        </View>
+              {payment !== 'Crédito' ? (
+                <View style={{ marginTop: 16 }}>
+                  <Text style={s.label}>Conta</Text>
+                  <TouchableOpacity style={s.picker} onPress={()=>setPickerType('account')}>
+                    <Text style={s.pickerTxt}>{selectedAccount?.name||'Selecione...'}</Text>
+                    <Ionicons name="chevron-down" size={16} color="#94a3b8"/>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={{ marginTop: 16 }}>
+                  <Text style={s.label}>Cartão de Crédito</Text>
+                  <TouchableOpacity style={s.picker} onPress={()=>setPickerType('card')}>
+                    <Text style={s.pickerTxt}>{selectedCard?.name||'Selecione...'}</Text>
+                    <Ionicons name="chevron-down" size={16} color="#94a3b8"/>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Categoria */}
+            <View style={s.group}>
+              <Text style={s.label}>Categoria</Text>
+              <TouchableOpacity style={s.picker} onPress={()=>setPickerType('category')}>
+                <Text style={s.pickerTxt}>{selectedCategory?.name||'Selecione...'}</Text>
+                <Ionicons name="chevron-down" size={16} color="#94a3b8"/>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         {/* Observacoes */}
         <View style={s.group}>
@@ -217,17 +243,21 @@ export default function NewTransactionScreen() {
               <TouchableOpacity onPress={()=>setPickerType(null)}><Ionicons name="close" size={22} color="#64748b"/></TouchableOpacity>
             </View>
             <FlatList
-              data={pickerType==='account'?accounts:pickerType==='card'?cards:categories}
+              data={pickerType==='account' || pickerType==='destAccount' ? accounts : pickerType==='card' ? cards : categories}
               keyExtractor={i=>i.id.toString()}
               renderItem={({item})=>(
                 <TouchableOpacity style={s.modalRow} onPress={()=>{
                   if (pickerType==='account') setAccountId(item.id);
+                  else if (pickerType==='destAccount') setDestAccountId(item.id);
                   else if (pickerType==='card') setCardId(item.id);
                   else setCategoryId(item.id);
                   setPickerType(null);
                 }}>
                   <Text style={s.modalRowTxt}>{item.name}</Text>
-                  {((pickerType==='account'&&accountId===item.id)||(pickerType==='card'&&cardId===item.id)||(pickerType==='category'&&categoryId===item.id))&&
+                  {((pickerType==='account'&&accountId===item.id)||
+                    (pickerType==='destAccount'&&destAccountId===item.id)||
+                    (pickerType==='card'&&cardId===item.id)||
+                    (pickerType==='category'&&categoryId===item.id))&&
                     <Ionicons name="checkmark" size={18} color="#10b981"/>}
                 </TouchableOpacity>
               )}
@@ -248,26 +278,26 @@ const s=StyleSheet.create({
   closeBtn:{width:36,height:36,borderRadius:18,backgroundColor:'#f8fafc',justifyContent:'center',alignItems:'center'},
   scroll:{padding:24},
   typeRow:{flexDirection:'row',gap:12,marginBottom:24},
-  typeBtn:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:14,borderRadius:14,borderWidth:2,borderColor:'#e2e8f0',backgroundColor:'#f8fafc'},
-  typeTxt:{fontSize:15,fontWeight:'600',color:'#94a3b8'},
+  typeBtn:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:12,borderRadius:8,borderWidth:1,borderColor:'#e2e8f0',backgroundColor:'#fff'},
+  typeTxt:{fontSize:14,fontWeight:'500',color:'#94a3b8'},
   group:{marginBottom:20},
-  label:{fontSize:13,fontWeight:'600',color:'#374151',marginBottom:8},
-  inputRow:{flexDirection:'row',alignItems:'center',borderWidth:1.5,borderColor:'#e2e8f0',borderRadius:12,backgroundColor:'#f8fafc',paddingHorizontal:16,height:52},
-  prefix:{fontSize:18,fontWeight:'700',color:'#94a3b8',marginRight:8},
-  amtInput:{flex:1,fontSize:24,fontWeight:'800',color:'#0f172a'},
-  input:{borderWidth:1.5,borderColor:'#e2e8f0',borderRadius:12,backgroundColor:'#f8fafc',paddingHorizontal:16,height:50,fontSize:15,color:'#0f172a'},
-  inputIconWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, backgroundColor: '#f8fafc', paddingHorizontal: 14, height: 50, gap: 10 },
-  inputClean: { flex: 1, fontSize: 15, color: '#0f172a' },
-  statusBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, height: 48, borderRadius: 12, borderWidth: 1.5, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
-  statusTxt: { fontSize: 14, fontWeight: '700', color: '#64748b' },
-  sectionBox: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' },
+  label:{fontSize:13,fontWeight:'500',color:'#475569',marginBottom:8},
+  inputRow:{flexDirection:'row',alignItems:'center',borderWidth:1,borderColor:'#e2e8f0',borderRadius:8,backgroundColor:'#fff',paddingHorizontal:14,height:48},
+  prefix:{fontSize:18,fontWeight:'600',color:'#94a3b8',marginRight:8},
+  amtInput:{flex:1,fontSize:20,fontWeight:'700',color:'#0f172a'},
+  input:{borderWidth:1,borderColor:'#e2e8f0',borderRadius:8,backgroundColor:'#fff',paddingHorizontal:14,height:48,fontSize:14,color:'#0f172a'},
+  inputIconWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, backgroundColor: '#fff', paddingHorizontal: 12, height: 48, gap: 8 },
+  inputClean: { flex: 1, fontSize: 14, color: '#0f172a', paddingVertical: 0 },
+  statusBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, height: 44, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' },
+  statusTxt: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  sectionBox: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 16 },
-  picker:{flexDirection:'row',alignItems:'center',borderWidth:1.5,borderColor:'#cbd5e1',borderRadius:12,backgroundColor:'#fff',paddingHorizontal:16,height:50,gap:10},
-  pickerTxt:{flex:1,fontSize:15,color:'#0f172a'},
+  picker:{flexDirection:'row',alignItems:'center',borderWidth:1,borderColor:'#e2e8f0',borderRadius:8,backgroundColor:'#fff',paddingHorizontal:14,height:48,gap:10},
+  pickerTxt:{flex:1,fontSize:14,color:'#0f172a'},
   payRow:{gap:8},
-  pill:{paddingHorizontal:24,paddingVertical:12,borderRadius:12,backgroundColor:'#fff',borderWidth:1.5,borderColor:'#cbd5e1'},
+  pill:{paddingHorizontal:20,paddingVertical:10,borderRadius:8,backgroundColor:'#fff',borderWidth:1,borderColor:'#e2e8f0'},
   pillA:{backgroundColor:'#0f172a',borderColor:'#0f172a'},
-  pillTxt:{fontSize:14,fontWeight:'600',color:'#64748b'},
+  pillTxt:{fontSize:13,fontWeight:'500',color:'#64748b'},
   pillTxtA:{color:'#fff'},
   uploadBox: { borderWidth: 2, borderColor: '#e2e8f0', borderStyle: 'dashed', borderRadius: 16, padding: 24, alignItems: 'center', backgroundColor: '#f8fafc' },
   uploadTxt: { fontSize: 14, fontWeight: '600', color: '#10b981', marginTop: 12 },

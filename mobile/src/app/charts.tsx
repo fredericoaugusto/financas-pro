@@ -1,85 +1,131 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  ActivityIndicator, Dimensions, RefreshControl
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { PieChart, LineChart, BarChart } from 'react-native-chart-kit';
 import api from '../services/api';
-import { toast } from '../components/Toast';
 
-export default function ChartsScreen() {
+const { width: SW } = Dimensions.get('window');
+const CHART_W = SW - 80;
+
+const chartCfg = {
+  backgroundGradientFrom: '#fff',
+  backgroundGradientTo: '#fff',
+  color: (opacity = 1) => `rgba(15, 23, 42, ${opacity})`,
+  labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
+  strokeWidth: 2,
+  decimalPlaces: 0,
+  propsForDots: { r: '4', strokeWidth: '2', stroke: '#10b981' },
+};
+
+const PERIODS = ['Este Mês', 'Últimos 3 meses', 'Últimos 6 meses', 'Este Ano'];
+const TABS = ['Visão Geral', 'Despesas', 'Receitas'];
+
+export default function ChartsScreenFull() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  
-  // Filtros
-  const [period, setPeriod] = useState('Este Mês');
+  const [refreshing, setRefreshing] = useState(false);
+  const [period, setPeriod] = useState('Últimos 6 meses');
   const [tab, setTab] = useState('Visão Geral');
-  const PERIODS = ['Este Mês', 'Últimos 30 dias', 'Este Ano'];
-  const TABS = ['Visão Geral', 'Despesas', 'Receitas', 'Crédito', 'Planejamento'];
 
-  // Dados mockados ou da API
-  const [savingsRate, setSavingsRate] = useState({ rate: 0, saved: 0, revenues: 0, expenses: 0 });
+  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [monthlyData, setMonthlyData] = useState<any>(null);
+  const [barData, setBarData] = useState<any>(null);
+  const [savingsRate, setSavingsRate] = useState(0);
+  const [savingsSaved, setSavingsSaved] = useState(0);
+  const [savingsRevenues, setSavingsRevenues] = useState(0);
+  const [savingsExpenses, setSavingsExpenses] = useState(0);
 
   useFocusEffect(useCallback(() => { loadData(); }, [period]));
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      // Exemplo: Buscar taxa de poupança real
-      const res = await api.get('/reports/savings-rate');
-      if (res.data) setSavingsRate(res.data);
-    } catch {
-      // Ignora erro se rota não existir no momento
-    } finally {
-      setLoading(false);
-    }
+  const getDateFrom = () => {
+    const d = new Date();
+    if (period === 'Este Mês') d.setDate(1);
+    else if (period === 'Últimos 3 meses') d.setMonth(d.getMonth() - 2);
+    else if (period === 'Últimos 6 meses') d.setMonth(d.getMonth() - 5);
+    else d.setMonth(0), d.setDate(1); // Este ano
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
   };
 
-  const EmptyChart = ({ title, icon }: { title: string, icon: any }) => (
-    <View style={s.chartBox}>
-      <Text style={s.chartTitle}>{title}</Text>
-      <View style={s.emptyContent}>
-        <Ionicons name={icon} size={32} color="#cbd5e1" />
-        <Text style={s.emptyTxt}>Nenhum lançamento no período selecionado</Text>
-        <Text style={s.emptySub}>Registre transações para visualizar.</Text>
-      </View>
-    </View>
-  );
+  const loadData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
+    try {
+      const strFrom = getDateFrom();
+      const COLORS = ['#10b981','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899'];
+
+      const [catRes, evoRes, saveRes] = await Promise.all([
+        api.get('/reports/by-category', { params: { type: tab === 'Receitas' ? 'receita' : 'despesa', date_from: strFrom } }),
+        api.get('/reports/monthly-evolution', { params: { date_from: strFrom } }),
+        api.get('/reports/savings-rate', { params: { date_from: strFrom } }),
+      ]);
+
+      setCategoryData(
+        (catRes.data.data || []).slice(0, 8).map((c: any, i: number) => ({
+          name: c.name.length > 12 ? c.name.slice(0, 12) + '…' : c.name,
+          population: parseFloat(c.total) || 0,
+          color: c.color || COLORS[i % COLORS.length],
+          legendFontColor: '#1e293b',
+          legendFontSize: 11,
+        }))
+      );
+
+      const rawEvo = evoRes.data.data || evoRes.data;
+      if (rawEvo?.length > 0) {
+        setMonthlyData({
+          labels: rawEvo.map((m: any) => m.month || ''),
+          datasets: [
+            { data: rawEvo.map((m: any) => parseFloat(m.receita) || 0), color: (o=1) => `rgba(16,185,129,${o})`, strokeWidth: 2 },
+            { data: rawEvo.map((m: any) => parseFloat(m.despesa) || 0), color: (o=1) => `rgba(239,68,68,${o})`, strokeWidth: 2 },
+          ],
+          legend: ['Receitas', 'Despesas'],
+        });
+        setBarData({
+          labels: rawEvo.map((m: any) => m.month || ''),
+          datasets: [{ data: rawEvo.map((m: any) => parseFloat(m.despesa) || 0) }],
+        });
+      }
+
+      const rate = parseFloat(saveRes.data.rate || saveRes.data.savings_rate || 0);
+      setSavingsRate(Math.max(0, Math.min(100, rate)));
+      setSavingsSaved(parseFloat(saveRes.data.saved || 0));
+      setSavingsRevenues(parseFloat(saveRes.data.revenues || 0));
+      setSavingsExpenses(parseFloat(saveRes.data.expenses || 0));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   return (
     <View style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}><Ionicons name="arrow-back" size={22} color="#0f172a" /></TouchableOpacity>
-        <View style={{ flex: 1 }}><Text style={s.title}>Gráficos</Text><Text style={s.sub}>Análise financeira avançada</Text></View>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <Ionicons name="arrow-back" size={22} color="#0f172a" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={s.title}>Gráficos</Text>
+          <Text style={s.sub}>Análise financeira avançada</Text>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        
-        {/* Período Pills */}
-        <View style={s.periodRow}>
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor="#10b981" colors={['#10b981']} />}
+      >
+        {/* Período */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
           {PERIODS.map(p => (
             <TouchableOpacity key={p} style={[s.periodBtn, period === p && s.periodBtnA]} onPress={() => setPeriod(p)}>
               <Text style={[s.periodTxt, period === p && s.periodTxtA]}>{p}</Text>
             </TouchableOpacity>
           ))}
-        </View>
-
-        {/* Dropdowns (Visuais simulados) */}
-        <TouchableOpacity style={s.selectBox}>
-          <Text style={s.selectTxt}>Todas as contas</Text>
-          <Ionicons name="chevron-down" size={16} color="#94a3b8" />
-        </TouchableOpacity>
-        <TouchableOpacity style={s.selectBox}>
-          <Text style={s.selectTxt}>Todas as categorias</Text>
-          <Ionicons name="chevron-down" size={16} color="#94a3b8" />
-        </TouchableOpacity>
-        <TouchableOpacity style={s.selectBox}>
-          <Ionicons name="calendar-outline" size={16} color="#94a3b8" style={{marginRight: 8}} />
-          <Text style={s.selectTxt}>01/05/2026 - 31/05/2026</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={s.advFilters}>
-          <Text style={s.advFiltersTxt}>Filtros avançados</Text>
-          <Ionicons name="chevron-down" size={14} color="#10b981" />
-        </TouchableOpacity>
+        </ScrollView>
 
         {/* Tabs */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabsWrap} contentContainerStyle={s.tabsContent}>
@@ -90,47 +136,105 @@ export default function ChartsScreen() {
           ))}
         </ScrollView>
 
-        {loading ? <View style={{padding: 40, alignItems: 'center'}}><ActivityIndicator size="large" color="#10b981"/></View> : (
-          <View style={s.dashboard}>
-            
-            {/* Taxa de Poupança (Visão Geral) */}
+        {loading ? (
+          <View style={{ padding: 40, alignItems: 'center' }}><ActivityIndicator size="large" color="#10b981" /></View>
+        ) : (
+          <>
+            {/* Savings Card */}
             {tab === 'Visão Geral' && (
-              <View style={s.savingsCard}>
-                <Text style={s.savingsTitle}>Taxa de Poupança</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginVertical: 8 }}>
-                  <Text style={s.savingsRate}>{savingsRate.rate.toFixed(1)}%</Text>
-                  <Text style={s.savingsSaved}>Economizou R$ {savingsRate.saved.toFixed(2)}</Text>
-                </View>
-                
-                <View style={s.barBg}>
-                  <View style={[s.barFill, { width: `${Math.min(savingsRate.rate, 100)}%` }]} />
-                </View>
-                
-                <View style={s.savingsFtr}>
-                  <View>
-                    <Text style={s.savingsFtrLbl}>Receitas</Text>
-                    <Text style={[s.savingsFtrVal, { color: '#10b981' }]}>R$ {savingsRate.revenues.toFixed(2)}</Text>
+              <View style={s.card}>
+                <Text style={s.cardTitle}>Taxa de Poupança</Text>
+                <View style={s.savingsRow}>
+                  <View style={s.savingsCircle}>
+                    <Text style={[s.ringPct, { color: savingsRate >= 20 ? '#10b981' : savingsRate >= 10 ? '#f59e0b' : '#ef4444' }]}>{savingsRate.toFixed(1)}%</Text>
+                    <Text style={s.ringSub}>poupado</Text>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={s.savingsFtrLbl}>Despesas</Text>
-                    <Text style={[s.savingsFtrVal, { color: '#ef4444' }]}>R$ {savingsRate.expenses.toFixed(2)}</Text>
+                  <View style={{ flex: 1 }}>
+                    <View style={s.barBg}>
+                      <View style={[s.barFill, { width: `${savingsRate}%` as any, backgroundColor: savingsRate >= 20 ? '#10b981' : savingsRate >= 10 ? '#f59e0b' : '#ef4444' }]} />
+                    </View>
+                    <Text style={s.savingsAmt}>Economizou R$ {savingsSaved.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                      <View>
+                        <Text style={s.savingsFtrLbl}>Receitas</Text>
+                        <Text style={[s.savingsFtrVal, { color: '#10b981' }]}>R$ {savingsRevenues.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={s.savingsFtrLbl}>Despesas</Text>
+                        <Text style={[s.savingsFtrVal, { color: '#ef4444' }]}>R$ {savingsExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
               </View>
             )}
 
-            {/* Empty Charts */}
-            <EmptyChart title="Evolução do Saldo (Acumulado)" icon="trending-up" />
-            <EmptyChart title="Receitas vs Despesas" icon="bar-chart-outline" />
-            
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1 }}><EmptyChart title="Despesas por Categoria" icon="pie-chart-outline" /></View>
-              <View style={{ flex: 1 }}><EmptyChart title="Fixas vs Variáveis" icon="pie-chart-outline" /></View>
-            </View>
+            {/* Line Chart */}
+            {tab === 'Visão Geral' && (
+              <View style={s.card}>
+                <Text style={s.cardTitle}>Receitas vs Despesas</Text>
+                <View style={s.legendRow}>
+                  <View style={s.legendItem}><View style={[s.legendDot, { backgroundColor: '#10b981' }]} /><Text style={s.legendTxt}>Receitas</Text></View>
+                  <View style={s.legendItem}><View style={[s.legendDot, { backgroundColor: '#ef4444' }]} /><Text style={s.legendTxt}>Despesas</Text></View>
+                </View>
+                {monthlyData ? (
+                  <LineChart
+                    data={monthlyData}
+                    width={CHART_W}
+                    height={200}
+                    chartConfig={chartCfg}
+                    bezier
+                    style={s.chartStyle}
+                    withShadow={false}
+                  />
+                ) : (
+                  <View style={s.emptyChart}><Ionicons name="trending-up" size={32} color="#cbd5e1" /><Text style={s.emptyTxt}>Dados insuficientes</Text></View>
+                )}
+              </View>
+            )}
 
-          </View>
+            {/* Bar Chart - Despesas Mensais */}
+            {(tab === 'Despesas' || tab === 'Visão Geral') && barData && (
+              <View style={s.card}>
+                <Text style={s.cardTitle}>{tab === 'Despesas' ? 'Despesas Mensais' : 'Despesas por Mês'}</Text>
+                <BarChart
+                  data={barData}
+                  width={CHART_W}
+                  height={200}
+                  chartConfig={{ ...chartCfg, color: (o=1) => `rgba(239,68,68,${o})` }}
+                  style={s.chartStyle}
+                  showValuesOnTopOfBars
+                  yAxisLabel="R$"
+                  yAxisSuffix=""
+                />
+              </View>
+            )}
+
+            {/* Pie Chart */}
+            <View style={s.card}>
+              <Text style={s.cardTitle}>{tab === 'Receitas' ? 'Receitas por Categoria' : 'Despesas por Categoria'}</Text>
+              {categoryData.length > 0 ? (
+                <PieChart
+                  data={categoryData}
+                  width={CHART_W}
+                  height={200}
+                  chartConfig={chartCfg}
+                  accessor="population"
+                  backgroundColor="transparent"
+                  paddingLeft="0"
+                  absolute
+                />
+              ) : (
+                <View style={s.emptyChart}>
+                  <Ionicons name="pie-chart-outline" size={32} color="#cbd5e1" />
+                  <Text style={s.emptyTxt}>Nenhum lançamento no período</Text>
+                </View>
+              )}
+            </View>
+          </>
         )}
 
+        <View style={{ height: 60 }} />
       </ScrollView>
     </View>
   );
@@ -141,42 +245,33 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingTop: 56, paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', gap: 12 },
   backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 20, fontWeight: '800', color: '#0f172a' }, sub: { fontSize: 13, color: '#64748b', marginTop: 2 },
-  scroll: { padding: 20, paddingBottom: 100 },
-  
-  periodRow: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 16 },
-  periodBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
-  periodBtnA: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  scroll: { padding: 20, paddingBottom: 40 },
+  periodBtn: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },
+  periodBtnA: { backgroundColor: '#0f172a', borderColor: '#0f172a' },
   periodTxt: { fontSize: 13, fontWeight: '600', color: '#64748b' },
-  periodTxtA: { color: '#10b981' },
-
-  selectBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, paddingHorizontal: 16, height: 48, marginBottom: 12 },
-  selectTxt: { flex: 1, fontSize: 14, color: '#334155' },
-
-  advFilters: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginBottom: 20 },
-  advFiltersTxt: { fontSize: 14, fontWeight: '600', color: '#10b981' },
-
-  tabsWrap: { marginBottom: 20, maxHeight: 40 },
-  tabsContent: { gap: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 8 },
-  tabBtn: { paddingBottom: 8, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  periodTxtA: { color: '#fff' },
+  tabsWrap: { marginBottom: 20, maxHeight: 48 },
+  tabsContent: { gap: 20, borderBottomWidth: 2, borderBottomColor: '#f1f5f9', paddingBottom: 10 },
+  tabBtn: { paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -12 },
   tabBtnA: { borderBottomColor: '#10b981' },
-  tabTxt: { fontSize: 15, fontWeight: '600', color: '#64748b' },
+  tabTxt: { fontSize: 15, fontWeight: '600', color: '#94a3b8' },
   tabTxtA: { color: '#10b981' },
-
-  dashboard: { gap: 16 },
-
-  savingsCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#f1f5f9' },
-  savingsTitle: { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  savingsRate: { fontSize: 32, fontWeight: '800', color: '#0f172a' },
-  savingsSaved: { fontSize: 13, color: '#94a3b8', fontWeight: '500' },
-  barBg: { height: 8, backgroundColor: '#f1f5f9', borderRadius: 4, marginVertical: 12, overflow: 'hidden' },
-  barFill: { height: '100%', backgroundColor: '#10b981', borderRadius: 4 },
-  savingsFtr: { flexDirection: 'row', justifyContent: 'space-between' },
-  savingsFtrLbl: { fontSize: 12, color: '#94a3b8', fontWeight: '600', marginBottom: 4 },
-  savingsFtrVal: { fontSize: 15, fontWeight: '700' },
-
-  chartBox: { backgroundColor: '#fff', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#f1f5f9', minHeight: 200 },
-  chartTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 16 },
-  emptyContent: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  emptyTxt: { fontSize: 13, color: '#64748b', fontWeight: '600', textAlign: 'center' },
-  emptySub: { fontSize: 12, color: '#94a3b8', textAlign: 'center' },
+  card: { backgroundColor: '#fff', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#f1f5f9', marginBottom: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 16 },
+  chartStyle: { marginVertical: 4, borderRadius: 12, marginLeft: -16 },
+  savingsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+  savingsCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  ringPct: { fontSize: 18, fontWeight: '900', lineHeight: 20 },
+  ringSub: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
+  barBg: { height: 8, backgroundColor: '#f1f5f9', borderRadius: 4, overflow: 'hidden', marginBottom: 10 },
+  barFill: { height: '100%', borderRadius: 4 },
+  savingsAmt: { fontSize: 13, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
+  savingsFtrLbl: { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginBottom: 3 },
+  savingsFtrVal: { fontSize: 14, fontWeight: '700' },
+  legendRow: { flexDirection: 'row', gap: 16, marginBottom: 8 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendTxt: { fontSize: 12, fontWeight: '600', color: '#64748b' },
+  emptyChart: { alignItems: 'center', paddingVertical: 32, gap: 8 },
+  emptyTxt: { fontSize: 13, color: '#94a3b8', fontWeight: '500' },
 });

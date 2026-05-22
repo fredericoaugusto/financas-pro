@@ -3,7 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const getBaseUrl = () => {
-  if (Platform.OS === 'web') return 'http://127.0.0.1:8000/api';
+  if (Platform.OS === 'web') {
+    // Para funcionar corretamente se você estiver rodando em um servidor remoto
+    const host = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1';
+    return `http://${host}:8000/api`;
+  }
   if (Platform.OS === 'ios') return 'http://127.0.0.1:8000/api';
   return 'http://10.0.2.2:8000/api'; // Android Emulator
 };

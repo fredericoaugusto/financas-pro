@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../services/api';
@@ -47,6 +47,22 @@ export default function CategoriesScreen() {
     finally { setSaving(false); }
   };
 
+  const del = async (id: number, catName: string) => {
+    Alert.alert('Excluir Categoria', `Deseja excluir "${catName}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir', style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/categories/${id}`);
+            toast({ type: 'success', title: 'Categoria excluída!' });
+            load();
+          } catch (e: any) { toast({ type: 'error', title: 'Erro', message: e.response?.data?.message }); }
+        }
+      }
+    ]);
+  };
+
   if (loading) return <View style={s.c}><ActivityIndicator size="large" color="#10b981"/></View>;
 
   return (
@@ -88,11 +104,18 @@ export default function CategoriesScreen() {
       )}
       <FlatList data={cats} keyExtractor={i=>i.id.toString()} contentContainerStyle={s.list}
         renderItem={({item})=>(
-          <TouchableOpacity style={s.row} onPress={()=>open(item)} activeOpacity={.7}>
-            <View style={[s.dot,{backgroundColor:item.color||'#10b981'}]}/>
-            <Text style={s.rn}>{item.name}</Text>
-            <Ionicons name="chevron-forward" size={16} color="#cbd5e1"/>
-          </TouchableOpacity>
+          <View style={s.row}>
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }} onPress={()=>open(item)} activeOpacity={.7}>
+              <View style={[s.dot,{backgroundColor:item.color||'#10b981'}]}/>
+              <Text style={s.rn}>{item.name}</Text>
+              <View style={[s.typePill, { backgroundColor: item.type === 'despesa' ? '#fee2e2' : '#dcfce7' }]}>
+                <Text style={[s.typePillTxt, { color: item.type === 'despesa' ? '#ef4444' : '#10b981' }]}>{item.type === 'despesa' ? 'Despesa' : 'Receita'}</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={()=>del(item.id, item.name)} style={s.delBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="trash-outline" size={16} color="#ef4444"/>
+            </TouchableOpacity>
+          </View>
         )}
         ListEmptyComponent={<EmptyState icon="pricetag-outline" title="Nenhuma categoria" subtitle="Crie categorias para organizar." actionLabel="Adicionar" onAction={()=>open()}/>}
       />
@@ -124,6 +147,10 @@ const s=StyleSheet.create({
   sb:{flex:1,height:44,borderRadius:12,backgroundColor:'#10b981',justifyContent:'center',alignItems:'center'},
   svt:{fontSize:14,fontWeight:'700',color:'#fff'},
   list:{padding:20,paddingBottom:100},
-  row:{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:14,padding:16,marginBottom:8,borderWidth:1,borderColor:'#f1f5f9',gap:12},
-  dot:{width:12,height:12,borderRadius:6},rn:{flex:1,fontSize:15,fontWeight:'600',color:'#1e293b'},
+  row:{flexDirection:'row',alignItems:'center',backgroundColor:'#fff',borderRadius:14,padding:14,marginBottom:8,borderWidth:1,borderColor:'#f1f5f9',gap:12},
+  dot:{width:12,height:12,borderRadius:6,flexShrink:0},
+  rn:{flex:1,fontSize:15,fontWeight:'600',color:'#1e293b'},
+  typePill:{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  typePillTxt:{ fontSize: 10, fontWeight: '700' },
+  delBtn:{ width: 32, height: 32, borderRadius: 9, backgroundColor: '#fee2e2', justifyContent: 'center', alignItems: 'center' },
 });
