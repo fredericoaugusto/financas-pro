@@ -743,4 +743,46 @@ class ReportController extends Controller
 
         return response()->json(['data' => $data]);
     }
+
+    /**
+     * Resumo principal para o Dashboard Mobile.
+     */
+    public function dashboard(Request $request)
+    {
+        $userId = Auth::id();
+        $startOfMonth = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $endOfMonth = $request->input('end_date', Carbon::now()->endOfMonth()->format('Y-m-d'));
+
+        // Calcula as receitas e despesas do mês atual
+        $receitasMes = Transaction::where('user_id', $userId)
+            ->where('type', 'receita')
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->sum('value');
+
+        $despesasMes = Transaction::where('user_id', $userId)
+            ->where('type', 'despesa')
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->sum('value');
+
+        // Calcula saldo atual (de todos os tempos) para dar o saldo total
+        $totalReceitas = Transaction::where('user_id', $userId)
+            ->where('type', 'receita')
+            ->sum('value');
+
+        $totalDespesas = Transaction::where('user_id', $userId)
+            ->where('type', 'despesa')
+            ->sum('value');
+
+        $saldoAtual = $totalReceitas - $totalDespesas;
+        // Para simplificar, o saldo previsto será o atual + receitas do mês - despesas do mês (que ainda não foram pagas)
+        // Como não temos controle profundo de status aqui, usaremos o saldo atual como base
+        $saldoPrevisto = $saldoAtual; 
+
+        return response()->json([
+            'saldo_atual' => 'R$ ' . number_format($saldoAtual, 2, ',', '.'),
+            'saldo_previsto' => 'R$ ' . number_format($saldoPrevisto, 2, ',', '.'),
+            'receitas_periodo' => 'R$ ' . number_format($receitasMes, 2, ',', '.'),
+            'despesas_periodo' => 'R$ ' . number_format($despesasMes, 2, ',', '.')
+        ]);
+    }
 }
